@@ -429,6 +429,29 @@ button.link:hover { background: none; color: var(--text); }
   resize: vertical;
 }
 
+.file-input {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.file-input input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.warn-text {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--bad);
+}
+
 .note-small {
   margin: 8px 0 0;
   font-size: 11.5px;

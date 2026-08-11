@@ -10,4 +10,5 @@ export * from './validate';
 export * from './edit';
 export * from './mosaic';
 export * from './generators';
+export * from './color';
 export * from './defaults';

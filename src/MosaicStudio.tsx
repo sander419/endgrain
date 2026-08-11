@@ -14,6 +14,7 @@ import {
 import type { GeneratorId, Mosaic, MosaicRecipe, WoodSpecies } from './core';
 import { hitTestCell, renderMosaic } from './render/mosaicBoard';
 import { textToMosaic } from './render/textMosaic';
+import { imageToMosaic } from './render/imageMosaic';
 import { MosaicPrintSheet } from './MosaicPrintSheet';
 import { useHistoryState } from './useHistoryState';
 
@@ -109,6 +110,9 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   const [text, setText] = useState(
     () => new URLSearchParams(window.location.search).get('text') ?? 'ДОМ'
   );
+  const [photoContrast, setPhotoContrast] = useState(0.35);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoName, setPhotoName] = useState<string | null>(null);
   const [sliceThicknessMm, setSliceThickness] = useState(40);
   const [sawKerfMm, setKerf] = useState(3);
   const [showPanels, setShowPanels] = useState(true);
@@ -117,6 +121,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   const [painting, setPainting] = useState(false);
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastPhotoRef = useRef<HTMLImageElement | null>(null);
 
   const speciesMap = useMemo(
     () => Object.fromEntries(SPECIES_CATALOG.map((species) => [species.id, species])),
@@ -190,6 +195,55 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     },
     [setMosaic, params.rows, params.cols, params.cellMm, palette]
   );
+
+  const applyPhoto = useCallback(
+    (image: HTMLImageElement, contrast: number) => {
+      try {
+        setMosaic(
+          imageToMosaic(image, {
+            rows: params.rows,
+            cols: params.cols,
+            cellMm: params.cellMm,
+            palette,
+            species: speciesMap,
+            contrast,
+          })
+        );
+        setPhotoError(null);
+      } catch {
+        setPhotoError('Не получилось разобрать изображение.');
+      }
+    },
+    [setMosaic, params.rows, params.cols, params.cellMm, palette, speciesMap]
+  );
+
+  const onPhotoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // разрешить выбрать тот же файл повторно
+    if (!file) return;
+    if (palette.length < 2) {
+      setPhotoError('Добавь минимум 2 породы в палитру ниже — фото не из чего собрать.');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      lastPhotoRef.current = image;
+      setPhotoName(file.name);
+      applyPhoto(image, photoContrast);
+      URL.revokeObjectURL(url);
+    };
+    image.onerror = () => {
+      setPhotoError('Файл не открылся как изображение.');
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  };
+
+  const onContrastChange = (value: number) => {
+    setPhotoContrast(value);
+    if (lastPhotoRef.current) applyPhoto(lastPhotoRef.current, value);
+  };
 
   // ?text=СЛОВО — сразу набрать надпись, для демо-ссылок.
   useEffect(() => {
@@ -319,6 +373,32 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
             <p className="note-small">
               Буквы ложатся в клетки: чем крупнее сетка, тем читаемее. Тонкие шрифты рассыпаются —
               лучше короткое слово на 20+ клеток в ширину.
+            </p>
+          </section>
+
+          <section>
+            <h2>Своё фото</h2>
+            <label className="wide file-input">
+              <input type="file" accept="image/*" onChange={onPhotoSelected} />
+              {photoName ? `📷 ${photoName}` : '📷 Выбрать фото'}
+            </label>
+            {lastPhotoRef.current && (
+              <label className="oil">
+                <span>Контраст</span>
+                <input
+                  type="range" min={0} max={100}
+                  value={Math.round(photoContrast * 100)}
+                  onChange={(event) => onContrastChange(Number(event.target.value) / 100)}
+                />
+                <span>{Math.round(photoContrast * 100)}%</span>
+              </label>
+            )}
+            {photoError && <p className="warn-text">{photoError}</p>}
+            <p className="note-small">
+              Фото обрезается по центру под пропорции доски и сводится к {palette.length}{' '}
+              {plural(palette.length, 'породе', 'породам', 'породам')} из палитры ниже. Силуэт
+              с контрастным фоном получается лучше, чем портрет — на редкой сетке мелкие детали
+              лица не читаются.
             </p>
           </section>
 
