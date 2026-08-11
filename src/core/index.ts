@@ -12,4 +12,6 @@ export * from './mosaic';
 export * from './generators';
 export * from './color';
 export * from './mosaicShare';
+export * from './analysis';
+export * from './favorites';
 export * from './defaults';

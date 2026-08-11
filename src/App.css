@@ -404,6 +404,125 @@ button.link:hover { background: none; color: var(--text); }
 
 /* ── Мозаика ───────────────────────────────────────── */
 
+.studio-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.studio-tabs button {
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 16px;
+  font-size: 13px;
+  position: relative;
+  top: 1px;
+}
+
+.studio-tabs button:hover { color: var(--text); background: #1f1813; }
+
+.studio-tabs button.on {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.studio-tabs .badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #23150a;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.layout.studio .panel { max-height: calc(100vh - 110px); }
+
+.style-tagline { margin-top: 0; margin-bottom: 12px; color: var(--text); }
+
+.editor label input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 0; }
+
+.editor label .value {
+  font: 12px ui-monospace, Menlo, monospace;
+  color: var(--text);
+  width: 26px;
+  text-align: right;
+}
+
+.advice {
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  border-left: 2px solid var(--accent);
+  background: #221a13;
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* ── Галерея избранного ────────────────────────────── */
+
+.gallery {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  align-content: start;
+  padding: 4px;
+}
+
+.gallery .empty {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  text-align: center;
+  padding: 48px 24px;
+  line-height: 1.6;
+}
+
+.gallery-card {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-card img {
+  width: 100%;
+  display: block;
+  background: #14100d;
+}
+
+.gallery-card figcaption {
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.gallery-card figcaption span { color: var(--muted); font-size: 11px; }
+
+.gallery-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.gallery-actions button { flex: 1; font-size: 12px; padding: 5px 8px; }
+.gallery-actions button.ghost { background: transparent; color: var(--muted); }
+
 .palette { display: flex; flex-wrap: wrap; gap: 5px; }
 
 .chip {

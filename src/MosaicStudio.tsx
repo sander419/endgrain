@@ -1,19 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  FAMILY_NAMES,
+  FAVORITES_LIMIT,
   GENERATORS,
+  GENERATOR_BY_ID,
   SPECIES_CATALOG,
+  addFavorite,
+  analyseMosaic,
   buildMosaicShareUrl,
   compileMosaic,
   emptyMosaic,
   formatLength,
   generateMosaic,
+  loadFavorites,
   mosaicSize,
   paintCell,
   plural,
   readMosaicDnaFromLocation,
+  removeFavorite,
   resizeMosaic,
 } from './core';
-import type { GeneratorId, Mosaic, MosaicRecipe, WoodSpecies } from './core';
+import type {
+  ControlKey,
+  Favorite,
+  GeneratorFamily,
+  GeneratorId,
+  Mosaic,
+  MosaicRecipe,
+  WoodSpecies,
+} from './core';
 import { hitTestCell, renderMosaic } from './render/mosaicBoard';
 import { textToMosaic } from './render/textMosaic';
 import { imageToMosaic } from './render/imageMosaic';
@@ -21,6 +36,17 @@ import { MosaicPrintSheet } from './MosaicPrintSheet';
 import { useHistoryState } from './useHistoryState';
 
 const STORAGE_KEY = 'endgrain.mosaic.v1';
+
+/** Вкладки: у каждой свой набор инструментов и свой вид превью. */
+type Tab = 'style' | 'draw' | 'board' | 'plan' | 'saved';
+
+const TABS: { id: Tab; label: string; hint: string }[] = [
+  { id: 'style', label: 'Стиль', hint: 'Выбрать узор и покрутить его параметры' },
+  { id: 'draw', label: 'Рисовать', hint: 'Кисть, текст, своё фото' },
+  { id: 'board', label: 'Доска', hint: 'Размер сетки, породы, толщина' },
+  { id: 'plan', label: 'Производство', hint: 'Щиты, материал, отходы' },
+  { id: 'saved', label: 'Избранное', hint: 'Отложенные варианты' },
+];
 
 /** Породы от светлой к тёмной — в этом порядке их ждут генераторы. */
 function byLightness(a: WoodSpecies, b: WoodSpecies): number {
@@ -38,6 +64,7 @@ interface Params {
   rows: number;
   cols: number;
   cellMm: number;
+  scale: number;
   rays: number;
   rings: number;
   seed: number;
@@ -45,10 +72,11 @@ interface Params {
 }
 
 const DEFAULT_PARAMS: Params = {
-  generator: 'mandala',
+  generator: 'tumbling',
   rows: 21,
   cols: 21,
   cellMm: 25,
+  scale: 3,
   rays: 6,
   rings: 6,
   seed: 7,
@@ -56,7 +84,7 @@ const DEFAULT_PARAMS: Params = {
   paletteIds: ['maple', 'oak', 'walnut', 'wenge'],
 };
 
-/** ?gen=landscape — прямая ссылка на конкретный генератор, для демо. */
+/** ?gen=landscape — прямая ссылка на конкретный стиль, для демо. */
 function paramsFromQuery(base: Params): Params {
   const query = new URLSearchParams(window.location.search);
   const generator = query.get('gen');
@@ -66,12 +94,15 @@ function paramsFromQuery(base: Params): Params {
   return base;
 }
 
+const FAMILY_ORDER: GeneratorFamily[] = ['joinery', 'geometry', 'radial', 'generative'];
+
 interface Props {
   oil: number;
   onOilChange: (value: number) => void;
 }
 
 export function MosaicStudio({ oil, onOilChange }: Props) {
+  const [tab, setTab] = useState<Tab>('style');
   const [params, setParams] = useState<Params>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}.params`);
@@ -95,22 +126,13 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     if (fromDna) return fromDna;
 
     const start = paramsFromQuery(DEFAULT_PARAMS);
-    // Ссылка с ?gen= всегда открывает свежий рисунок, иначе — сохранённый.
     if (start.generator === DEFAULT_PARAMS.generator) {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return JSON.parse(saved) as Mosaic;
       } catch { /* дефолт */ }
     }
-    return generateMosaic(start.generator, {
-      rows: start.rows,
-      cols: start.cols,
-      cellMm: start.cellMm,
-      palette: start.paletteIds,
-      rays: start.rays,
-      rings: start.rings,
-      seed: start.seed,
-    });
+    return generateMosaic(start.generator, { ...start, palette: start.paletteIds });
   });
 
   const [brush, setBrush] = useState<string>(palette[palette.length - 1] ?? 'walnut');
@@ -122,12 +144,12 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   const [photoName, setPhotoName] = useState<string | null>(null);
   const [sliceThicknessMm, setSliceThickness] = useState(40);
   const [sawKerfMm, setKerf] = useState(3);
-  const [showPanels, setShowPanels] = useState(true);
   const [highlightPanel, setHighlightPanel] = useState<number | null>(null);
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
   const [painting, setPainting] = useState(false);
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Favorite[]>(() => loadFavorites());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPhotoRef = useRef<HTMLImageElement | null>(null);
 
@@ -135,6 +157,8 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     () => Object.fromEntries(SPECIES_CATALOG.map((species) => [species.id, species])),
     []
   );
+
+  const meta = GENERATOR_BY_ID[params.generator];
 
   const recipe: MosaicRecipe = useMemo(
     () => ({
@@ -148,6 +172,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   );
 
   const plan = useMemo(() => compileMosaic(recipe), [recipe]);
+  const analysis = useMemo(() => analyseMosaic(mosaic), [mosaic]);
   const size = mosaicSize(mosaic);
 
   useEffect(() => {
@@ -157,33 +182,39 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     } catch { /* приватный режим */ }
   }, [mosaic, params]);
 
+  const flash = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2200);
+  };
+
   const regenerate = useCallback(
     (next: Params) => {
-      if (next.paletteIds.length === 0) return;
       const ordered = SPECIES_CATALOG.filter((s) => next.paletteIds.includes(s.id))
         .sort(byLightness)
         .map((s) => s.id);
-      setMosaic(
-        generateMosaic(next.generator, {
-          rows: next.rows,
-          cols: next.cols,
-          cellMm: next.cellMm,
-          palette: ordered,
-          rays: next.rays,
-          rings: next.rings,
-          seed: next.seed,
-        })
-      );
+      setMosaic(generateMosaic(next.generator, { ...next, palette: ordered }));
     },
     [setMosaic]
   );
 
-  const patch = (changes: Partial<Params>, regen = true) => {
+  /** Правка параметров стиля: всегда перерисовывает — иначе ползунок «мёртвый». */
+  const patchStyle = (changes: Partial<Params>) => {
     setParams((current) => {
       const next = { ...current, ...changes };
-      if (regen) regenerate(next);
-      else if (changes.rows || changes.cols) {
+      regenerate(next);
+      return next;
+    });
+  };
+
+  /** Правка размеров доски: рисунок сохраняется, сетка подрезается/добивается. */
+  const patchBoard = (changes: Partial<Params>) => {
+    setParams((current) => {
+      const next = { ...current, ...changes };
+      if (changes.rows !== undefined || changes.cols !== undefined) {
         setMosaic((m) => resizeMosaic(m, next.rows, next.cols, palette[0] ?? 'maple'));
+      }
+      if (changes.cellMm !== undefined) {
+        setMosaic((m) => ({ ...m, cellMm: next.cellMm }));
       }
       return next;
     });
@@ -227,10 +258,10 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
   const onPhotoSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = ''; // разрешить выбрать тот же файл повторно
+    event.target.value = '';
     if (!file) return;
     if (palette.length < 2) {
-      setPhotoError('Добавь минимум 2 породы в палитру ниже — фото не из чего собрать.');
+      setPhotoError('Добавь минимум 2 породы во вкладке «Доска» — фото не из чего собрать.');
       return;
     }
     const url = URL.createObjectURL(file);
@@ -257,9 +288,11 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   useEffect(() => {
     const fromQuery = new URLSearchParams(window.location.search).get('text');
     if (fromQuery) setFromText(fromQuery);
-    // Только на старте: дальше текст набирается кнопкой.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Щиты подсвечиваются только на вкладке производства — там это по делу. */
+  const showPanels = tab === 'plan';
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -285,13 +318,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     return () => window.removeEventListener('resize', onResize);
   }, [draw]);
 
-  const flash = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2200);
-  };
-
-  // Ссылку с ДНК могут открыть во вкладке, где студия уже запущена —
-  // меняется только hash, документ не перезагружается.
+  // Ссылку с ДНК могут открыть во вкладке, где студия уже запущена.
   useEffect(() => {
     const onHashChange = () => {
       const fromDna = readMosaicDnaFromLocation();
@@ -303,27 +330,13 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [setMosaic]);
 
-  const onShare = async () => {
-    const url = buildMosaicShareUrl(mosaic);
-    try {
-      await navigator.clipboard.writeText(url);
-      flash('ДНК мозаики скопирована в буфер');
-    } catch {
-      window.location.hash = url.split('#')[1] ?? '';
-      flash('ДНК мозаики в адресной строке');
-    }
-  };
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
       if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'я')) {
         event.preventDefault();
         if (event.shiftKey) history.redo();
         else history.undo();
-        return;
       }
-      if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -342,10 +355,48 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     );
   };
 
+  /** Кисть работает только на вкладке рисования — иначе случайные клики портят узор. */
   const paintAt = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (tab !== 'draw') return;
     const cell = cellAt(event);
     if (!cell) return;
     setMosaic((current) => paintCell(current, cell.row, cell.col, brush));
+  };
+
+  const renderThumbnail = useCallback(
+    (target: Mosaic, width = 220): string => {
+      const { rows, cols } = mosaicSize(target);
+      const offscreen = document.createElement('canvas');
+      offscreen.width = width;
+      offscreen.height = Math.max(1, Math.round((width * rows) / Math.max(1, cols)));
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) return '';
+      renderMosaic(ctx, target, { species: speciesMap, oil, background: '#14100d' });
+      return offscreen.toDataURL('image/png');
+    },
+    [speciesMap, oil]
+  );
+
+  const onSaveFavorite = () => {
+    const next = addFavorite(favorites, {
+      title: meta?.name ?? 'Рисунок',
+      mosaic,
+      thumbnail: renderThumbnail(mosaic),
+      summary: `${size.cols}×${size.rows} · ${plan.totals.glueUps} ${plural(plan.totals.glueUps, 'щит', 'щита', 'щитов')}`,
+    });
+    setFavorites(next);
+    flash(next.length >= FAVORITES_LIMIT ? 'Сохранено, старые вытесняются' : 'Отложено в избранное');
+  };
+
+  const onShare = async () => {
+    const url = buildMosaicShareUrl(mosaic);
+    try {
+      await navigator.clipboard.writeText(url);
+      flash('ДНК мозаики скопирована в буфер');
+    } catch {
+      window.location.hash = url.split('#')[1] ?? '';
+      flash('ДНК мозаики в адресной строке');
+    }
   };
 
   const onExportPng = () => {
@@ -358,226 +409,391 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   };
 
   const onPrint = () => {
-    const offscreen = document.createElement('canvas');
-    offscreen.width = 1200;
-    offscreen.height = Math.round((1200 * size.rows) / Math.max(1, size.cols));
-    const ctx = offscreen.getContext('2d');
-    if (ctx) {
-      renderMosaic(ctx, mosaic, { species: speciesMap, oil, background: '#ffffff' });
-      setBoardImage(offscreen.toDataURL('image/png'));
-    }
+    setBoardImage(renderThumbnail(mosaic, 1200));
     window.setTimeout(() => window.print(), 60);
   };
 
   const dims = plan.finalDimensions;
+  const paletteTooSmall = meta && palette.length < meta.minPalette;
+
+  const controlValue = (key: ControlKey): number => params[key];
 
   return (
     <>
-      <main className="layout">
-        <aside className="panel editor">
-          <section>
-            <h2>Рисунок</h2>
-            <div className="presets">
-              {GENERATORS.map((generator) => (
-                <button
-                  key={generator.id}
-                  className={params.generator === generator.id ? 'on' : ''}
-                  title={generator.tagline}
-                  onClick={() => patch({ generator: generator.id })}
-                >
-                  {generator.name}
-                </button>
-              ))}
-            </div>
-            <div className="row-actions">
-              <button onClick={() => patch({ seed: Math.floor(Math.random() * 1e9) })}>
-                🎲 Другой вариант
-              </button>
-            </div>
-          </section>
-
-          <section>
-            <h2>Свой текст</h2>
-            <textarea
-              value={text}
-              rows={2}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="СЛОВО&#10;ВТОРАЯ СТРОКА"
-            />
-            <button className="wide" onClick={() => setFromText(text)}>
-              Набрать текстом
-            </button>
-            <p className="note-small">
-              Буквы ложатся в клетки: чем крупнее сетка, тем читаемее. Тонкие шрифты рассыпаются —
-              лучше короткое слово на 20+ клеток в ширину.
-            </p>
-          </section>
-
-          <section>
-            <h2>Своё фото</h2>
-            <label className="wide file-input">
-              <input type="file" accept="image/*" onChange={onPhotoSelected} />
-              {photoName ? `📷 ${photoName}` : '📷 Выбрать фото'}
-            </label>
-            {lastPhotoRef.current && (
-              <label className="oil">
-                <span>Контраст</span>
-                <input
-                  type="range" min={0} max={100}
-                  value={Math.round(photoContrast * 100)}
-                  onChange={(event) => onContrastChange(Number(event.target.value) / 100)}
-                />
-                <span>{Math.round(photoContrast * 100)}%</span>
-              </label>
+      <div className="studio-tabs">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            className={tab === item.id ? 'on' : ''}
+            title={item.hint}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+            {item.id === 'saved' && favorites.length > 0 && (
+              <span className="badge">{favorites.length}</span>
             )}
-            {photoError && <p className="warn-text">{photoError}</p>}
-            <p className="note-small">
-              Фото обрезается по центру под пропорции доски и сводится к {palette.length}{' '}
-              {plural(palette.length, 'породе', 'породам', 'породам')} из палитры ниже. Силуэт
-              с контрастным фоном получается лучше, чем портрет — на редкой сетке мелкие детали
-              лица не читаются.
-            </p>
-          </section>
+          </button>
+        ))}
+      </div>
 
-          <section>
-            <h2>Сетка</h2>
-            <label>
-              Клеток по ширине
-              <input
-                type="number" min={3} max={60} value={params.cols}
-                onChange={(event) => patch({ cols: Number(event.target.value) }, false)}
-              />
-            </label>
-            <label>
-              Клеток по высоте
-              <input
-                type="number" min={3} max={60} value={params.rows}
-                onChange={(event) => patch({ rows: Number(event.target.value) }, false)}
-              />
-            </label>
-            <label>
-              Сторона клетки
-              <input
-                type="number" min={8} max={80} value={params.cellMm}
-                onChange={(event) => {
-                  const cellMm = Number(event.target.value);
-                  setParams((c) => ({ ...c, cellMm }));
-                  setMosaic((m) => ({ ...m, cellMm }));
-                }}
-              />
-            </label>
-            <label>
-              Лучей
-              <input
-                type="number" min={2} max={24} value={params.rays}
-                onChange={(event) => patch({ rays: Number(event.target.value) })}
-              />
-            </label>
-            <label>
-              Колец
-              <input
-                type="number" min={2} max={16} value={params.rings}
-                onChange={(event) => patch({ rings: Number(event.target.value) })}
-              />
-            </label>
-            <div className="row-actions">
-              <button onClick={() => regenerate(params)}>Перерисовать</button>
-              <button onClick={() => setMosaic(emptyMosaic(params.rows, params.cols, palette[0] ?? 'maple', params.cellMm))}>
-                Очистить
-              </button>
-            </div>
-          </section>
+      <main className="layout studio">
+        <aside className="panel editor">
+          {tab === 'style' && (
+            <>
+              {FAMILY_ORDER.map((family) => (
+                <section key={family}>
+                  <h2>{FAMILY_NAMES[family]}</h2>
+                  <div className="presets">
+                    {GENERATORS.filter((item) => item.family === family).map((item) => (
+                      <button
+                        key={item.id}
+                        className={params.generator === item.id ? 'on' : ''}
+                        title={item.tagline}
+                        onClick={() => patchStyle({ generator: item.id })}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
 
-          <section>
-            <h2>Палитра и кисть</h2>
-            <div className="palette">
-              {SPECIES_CATALOG.map((species) => {
-                const inPalette = params.paletteIds.includes(species.id);
-                return (
+              <section>
+                <h2>Настройка стиля</h2>
+                <p className="note-small style-tagline">{meta?.tagline}</p>
+
+                {meta?.controls.map((control) => (
+                  <label key={control.key}>
+                    {control.label}
+                    <input
+                      type="range"
+                      min={control.min}
+                      max={control.max}
+                      value={controlValue(control.key)}
+                      onChange={(event) => patchStyle({ [control.key]: Number(event.target.value) } as Partial<Params>)}
+                    />
+                    <span className="value">{controlValue(control.key)}</span>
+                  </label>
+                ))}
+
+                {meta?.controls.length === 0 && (
+                  <p className="note-small">У этого стиля нет настроек — рисунок задан целиком.</p>
+                )}
+
+                {meta?.seeded ? (
                   <button
-                    key={species.id}
-                    className={`chip${inPalette ? ' on' : ''}${brush === species.id ? ' brush' : ''}`}
-                    title={inPalette ? 'Кисть · правый клик убирает из палитры' : 'Добавить в палитру'}
-                    onClick={() => {
-                      if (inPalette) setBrush(species.id);
-                      else patch({ paletteIds: [...params.paletteIds, species.id] });
-                    }}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      if (params.paletteIds.length > 2) {
-                        patch({ paletteIds: params.paletteIds.filter((id) => id !== species.id) });
-                      }
-                    }}
+                    className="wide wild"
+                    onClick={() => patchStyle({ seed: Math.floor(Math.random() * 1e9) })}
                   >
-                    <span className="swatch small" style={{ background: species.colorHex }} />
-                    {species.name}
+                    🎲 Другой вариант этого стиля
                   </button>
-                );
-              })}
-            </div>
-            <p className="note-small">
-              Клик по породе из палитры — выбрать кисть, по остальным — добавить. Правый клик убирает.
-              Рисуй прямо по доске: клетка = торец бруска.
-            </p>
-          </section>
+                ) : (
+                  <p className="note-small">
+                    Фрактал задан математикой: вариантов у него нет, только размер сетки.
+                  </p>
+                )}
 
-          <section>
-            <h2>Распил</h2>
-            <label>
-              Толщина доски
-              <input
-                type="number" min={10} max={80} value={sliceThicknessMm}
-                onChange={(event) => setSliceThickness(Number(event.target.value))}
-              />
-            </label>
-            <label>
-              Пропил (kerf)
-              <input
-                type="number" min={0} step={0.1} value={sawKerfMm}
-                onChange={(event) => setKerf(Number(event.target.value))}
-              />
-            </label>
-            <label className="checkbox">
-              <input
-                type="checkbox" checked={showPanels}
-                onChange={(event) => setShowPanels(event.target.checked)}
-              />
-              Показывать щиты над доской
-            </label>
-          </section>
+                {paletteTooSmall && (
+                  <p className="warn-text">
+                    Стилю нужно минимум {meta?.minPalette} породы, сейчас {palette.length}.
+                    Добавь во вкладке «Доска».
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+
+          {tab === 'draw' && (
+            <>
+              <section>
+                <h2>Кисть</h2>
+                <div className="palette">
+                  {palette.map((id) => (
+                    <button
+                      key={id}
+                      className={`chip on${brush === id ? ' brush' : ''}`}
+                      onClick={() => setBrush(id)}
+                    >
+                      <span className="swatch small" style={{ background: speciesMap[id]?.colorHex }} />
+                      {speciesMap[id]?.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="note-small">
+                  Рисуй прямо по доске — клетка это торец бруска. Ctrl+Z отменяет.
+                  Породы для палитры набираются во вкладке «Доска».
+                </p>
+                <button
+                  className="wide"
+                  onClick={() => setMosaic(emptyMosaic(params.rows, params.cols, palette[0] ?? 'maple', params.cellMm))}
+                >
+                  Очистить доску
+                </button>
+              </section>
+
+              <section>
+                <h2>Свой текст</h2>
+                <textarea
+                  value={text}
+                  rows={2}
+                  onChange={(event) => setText(event.target.value)}
+                  placeholder="СЛОВО&#10;ВТОРАЯ СТРОКА"
+                />
+                <button className="wide" onClick={() => setFromText(text)}>Набрать текстом</button>
+                <p className="note-small">
+                  Буквы ложатся в клетки: чем крупнее сетка, тем читаемее. Короткое слово
+                  на 20+ клеток в ширину читается уверенно.
+                </p>
+              </section>
+
+              <section>
+                <h2>Своё фото</h2>
+                <label className="wide file-input">
+                  <input type="file" accept="image/*" onChange={onPhotoSelected} />
+                  {photoName ? `📷 ${photoName}` : '📷 Выбрать фото'}
+                </label>
+                {lastPhotoRef.current && (
+                  <label>
+                    Контраст
+                    <input
+                      type="range" min={0} max={100}
+                      value={Math.round(photoContrast * 100)}
+                      onChange={(event) => onContrastChange(Number(event.target.value) / 100)}
+                    />
+                    <span className="value">{Math.round(photoContrast * 100)}</span>
+                  </label>
+                )}
+                {photoError && <p className="warn-text">{photoError}</p>}
+                <p className="note-small">
+                  Фото обрезается по центру и сводится к породам палитры. Силуэт с контрастным
+                  фоном получается лучше портрета — на редкой сетке мелкие детали не читаются.
+                </p>
+              </section>
+            </>
+          )}
+
+          {tab === 'board' && (
+            <>
+              <section>
+                <h2>Породы в работе</h2>
+                <div className="palette">
+                  {SPECIES_CATALOG.map((species) => {
+                    const inPalette = params.paletteIds.includes(species.id);
+                    const last = inPalette && params.paletteIds.length <= 2;
+                    return (
+                      <button
+                        key={species.id}
+                        className={`chip${inPalette ? ' on' : ''}`}
+                        title={
+                          last
+                            ? 'Меньше двух пород узора не получится'
+                            : inPalette ? 'Убрать из палитры' : 'Добавить в палитру'
+                        }
+                        disabled={last}
+                        onClick={() =>
+                          patchStyle({
+                            paletteIds: inPalette
+                              ? params.paletteIds.filter((id) => id !== species.id)
+                              : [...params.paletteIds, species.id],
+                          })
+                        }
+                      >
+                        <span className="swatch small" style={{ background: species.colorHex }} />
+                        {species.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="note-small">
+                  Клик добавляет или убирает породу. Генераторы раскладывают их от светлой
+                  к тёмной, поэтому контрастный набор читается лучше.
+                </p>
+              </section>
+
+              <section>
+                <h2>Сетка</h2>
+                <label>
+                  Клеток по ширине
+                  <input
+                    type="number" min={3} max={60} value={params.cols}
+                    onChange={(event) => patchBoard({ cols: clampInput(event.target.value, 3, 60, params.cols) })}
+                  />
+                </label>
+                <label>
+                  Клеток по высоте
+                  <input
+                    type="number" min={3} max={60} value={params.rows}
+                    onChange={(event) => patchBoard({ rows: clampInput(event.target.value, 3, 60, params.rows) })}
+                  />
+                </label>
+                <label>
+                  Сторона клетки, мм
+                  <input
+                    type="number" min={8} max={80} value={params.cellMm}
+                    onChange={(event) => patchBoard({ cellMm: clampInput(event.target.value, 8, 80, params.cellMm) })}
+                  />
+                </label>
+                <p className="note-small">
+                  Размер доски: {formatLength(dims.topLengthMm, 'mm')} × {formatLength(dims.topWidthMm, 'mm')}.
+                  Смена сетки сохраняет рисунок — чтобы перерисовать под новый размер, зайди
+                  в «Стиль» и нажми «Другой вариант».
+                </p>
+              </section>
+
+              <section>
+                <h2>Распил</h2>
+                <label>
+                  Толщина доски, мм
+                  <input
+                    type="number" min={10} max={80} value={sliceThicknessMm}
+                    onChange={(event) => setSliceThickness(clampInput(event.target.value, 10, 80, sliceThicknessMm))}
+                  />
+                </label>
+                <label>
+                  Пропил (kerf), мм
+                  <input
+                    type="number" min={0} max={10} step={0.1} value={sawKerfMm}
+                    onChange={(event) => setKerf(clampInput(event.target.value, 0, 10, sawKerfMm))}
+                  />
+                </label>
+              </section>
+            </>
+          )}
+
+          {tab === 'plan' && (
+            <>
+              <section>
+                <h2>Как это собирать</h2>
+                <dl>
+                  <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
+                  <div><dt>Брусков заготовить</dt><dd>{plan.totals.stripsToPrepare}</dd></div>
+                  <div><dt>Поперечных резов</dt><dd>{plan.totals.crosscuts}</dd></div>
+                  <div><dt>Планок в доске</dt><dd>{plan.cols}</dd></div>
+                </dl>
+              </section>
+
+              <section>
+                <h2>Щиты</h2>
+                <div className="panels-list">
+                  {plan.panels.map((panel) => (
+                    <div
+                      key={panel.index}
+                      className="panel-card"
+                      onMouseEnter={() => setHighlightPanel(panel.index)}
+                      onMouseLeave={() => setHighlightPanel(null)}
+                    >
+                      <div className="panel-head">
+                        <b>Щит {panel.index}</b>
+                        <span>
+                          {panel.slices} {plural(panel.slices, 'планка', 'планки', 'планок')} ·{' '}
+                          {Math.round(panel.roughLengthMm)} мм
+                        </span>
+                      </div>
+                      <div className="panel-order">
+                        {panel.order.map((speciesId, index) => (
+                          <span
+                            key={index}
+                            className="cell-dot"
+                            title={speciesMap[speciesId]?.name}
+                            style={{ background: speciesMap[speciesId]?.colorHex }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="note-small">Наведи на щит — его колонки подсветятся на доске.</p>
+              </section>
+            </>
+          )}
+
+          {tab === 'saved' && (
+            <section>
+              <h2>Избранное</h2>
+              <button className="wide primary" onClick={onSaveFavorite}>
+                ★ Отложить текущий рисунок
+              </button>
+              <p className="note-small">
+                {favorites.length} из {FAVORITES_LIMIT}. Отложенное переживает перезагрузку;
+                при переполнении вытесняются самые старые.
+              </p>
+            </section>
+          )}
         </aside>
 
         <section className="stage">
-          <div className="canvas-wrap">
-            <canvas
-              ref={canvasRef}
-              className="pickable"
-              onMouseDown={(event) => { setPainting(true); paintAt(event); }}
-              onMouseUp={() => setPainting(false)}
-              onMouseLeave={() => { setPainting(false); setHover(null); }}
-              onMouseMove={(event) => {
-                setHover(cellAt(event));
-                if (painting) paintAt(event);
-              }}
-            />
-          </div>
+          {tab === 'saved' ? (
+            <div className="gallery">
+              {favorites.length === 0 && (
+                <p className="empty">
+                  Пока пусто. Нарисуй что-нибудь и нажми «Отложить» — можно спокойно
+                  экспериментировать дальше, вариант не потеряется.
+                </p>
+              )}
+              {favorites.map((item) => (
+                <figure key={item.id} className="gallery-card">
+                  <img src={item.thumbnail} alt={item.title} />
+                  <figcaption>
+                    <b>{item.title}</b>
+                    <span>{item.summary}</span>
+                  </figcaption>
+                  <div className="gallery-actions">
+                    <button
+                      onClick={() => {
+                        setMosaic(item.mosaic);
+                        setTab('style');
+                        flash('Рисунок восстановлен');
+                      }}
+                    >
+                      Открыть
+                    </button>
+                    <button
+                      className="ghost"
+                      onClick={() => {
+                        setFavorites(removeFavorite(favorites, item.id));
+                        flash('Удалено из избранного');
+                      }}
+                    >
+                      Убрать
+                    </button>
+                  </div>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="canvas-wrap">
+                <canvas
+                  ref={canvasRef}
+                  className={tab === 'draw' ? 'pickable' : ''}
+                  onMouseDown={(event) => { setPainting(true); paintAt(event); }}
+                  onMouseUp={() => setPainting(false)}
+                  onMouseLeave={() => { setPainting(false); setHover(null); }}
+                  onMouseMove={(event) => {
+                    if (tab === 'draw') setHover(cellAt(event));
+                    if (painting) paintAt(event);
+                  }}
+                />
+              </div>
 
-          <p className="hint">
-            {size.cols} × {size.rows} клеток по {params.cellMm} мм ·{' '}
-            {plan.totals.glueUps} {plural(plan.totals.glueUps, 'щит', 'щита', 'щитов')} ·{' '}
-            {plan.totals.stripsToPrepare} брусков · {plan.totals.crosscuts} резов
-            {plan.flippedSlices > 0 && ` · ${plan.flippedSlices} планок кладём перевёрнутыми`}
-          </p>
+              <p className="hint">
+                {size.cols} × {size.rows} клеток по {params.cellMm} мм ·{' '}
+                {plan.totals.glueUps} {plural(plan.totals.glueUps, 'щит', 'щита', 'щитов')} ·{' '}
+                {plan.totals.stripsToPrepare} брусков · {plan.totals.crosscuts} резов
+                {plan.flippedSlices > 0 && ` · ${plan.flippedSlices} планок кладём перевёрнутыми`}
+              </p>
 
-          <div className="oil">
-            <label>Масло / проявка текстуры</label>
-            <input
-              type="range" min={0} max={100}
-              value={Math.round(oil * 100)}
-              onChange={(event) => onOilChange(Number(event.target.value) / 100)}
-            />
-            <span>{Math.round(oil * 100)}%</span>
-          </div>
+              <div className="oil">
+                <label>Масло / проявка текстуры</label>
+                <input
+                  type="range" min={0} max={100}
+                  value={Math.round(oil * 100)}
+                  onChange={(event) => onOilChange(Number(event.target.value) / 100)}
+                />
+                <span>{Math.round(oil * 100)}%</span>
+              </div>
+            </>
+          )}
         </section>
 
         <aside className="panel report">
@@ -587,87 +803,50 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               {formatLength(dims.topLengthMm, 'mm')} × {formatLength(dims.topWidthMm, 'mm')} × {formatLength(dims.thicknessMm, 'mm')}
             </div>
             <dl>
-              <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
-              <div><dt>Брусков заготовить</dt><dd>{plan.totals.stripsToPrepare}</dd></div>
-              <div><dt>Поперечных резов</dt><dd>{plan.totals.crosscuts}</dd></div>
-              <div><dt>Планок в доске</dt><dd>{plan.cols}</dd></div>
-            </dl>
-          </section>
-
-          <section>
-            <h2>Щиты</h2>
-            <div className="panels-list">
-              {plan.panels.map((panel) => (
-                <div
-                  key={panel.index}
-                  className="panel-card"
-                  onMouseEnter={() => setHighlightPanel(panel.index)}
-                  onMouseLeave={() => setHighlightPanel(null)}
-                >
-                  <div className="panel-head">
-                    <b>Щит {panel.index}</b>
-                    <span>{panel.slices} {plural(panel.slices, 'планка', 'планки', 'планок')} · {Math.round(panel.roughLengthMm)} мм</span>
-                  </div>
-                  <div className="panel-order">
-                    {panel.order.map((speciesId, index) => (
-                      <span
-                        key={index}
-                        className="cell-dot"
-                        title={speciesMap[speciesId]?.name}
-                        style={{ background: speciesMap[speciesId]?.colorHex }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h2>Материал и отходы</h2>
-            <dl>
               <div><dt>Сырой объём</dt><dd>{plan.totals.rawVolumeM3.toFixed(5)} м³</dd></div>
               <div><dt>В доске</dt><dd>{plan.totals.netVolumeM3.toFixed(5)} м³</dd></div>
-              <div><dt>На пропил</dt><dd>{Math.round(plan.waste.crosscutKerfM3 * 1e9).toLocaleString('ru-RU')} мм³</dd></div>
-              <div><dt>На торцовку</dt><dd>{Math.round(plan.waste.endTrimM3 * 1e9).toLocaleString('ru-RU')} мм³</dd></div>
               <div className="accent"><dt>Отходы</dt><dd>{plan.totals.wastePct.toFixed(1)}%</dd></div>
               <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
             </dl>
           </section>
 
           <section>
-            <h2>По породам</h2>
-            <table className="materials">
-              <tbody>
-                {plan.materials.map((material) => (
-                  <tr key={material.speciesId}>
-                    <td>
-                      <span className="swatch small" style={{ background: speciesMap[material.speciesId]?.colorHex }} />
-                      {material.speciesName}
-                    </td>
-                    <td>{material.pieces} бр.</td>
-                    <td>{material.rawVolumeM3.toFixed(5)} м³</td>
-                    <td>{Math.round(material.cost).toLocaleString('ru-RU')} ₽</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h2>Способ сборки</h2>
+            {analysis.block ? (
+              <p className="advice">
+                Рисунок повторяется блоком <b>{analysis.block.blockCols}×{analysis.block.blockRows}</b>{' '}
+                ({analysis.block.repeatsX}×{analysis.block.repeatsY} раз). Собери один блок и
+                размножь его: короткие струбцины вместо длинных, блоки клеятся параллельно,
+                а брак в одном блоке не убивает всю доску.
+              </p>
+            ) : (
+              <p className="note-small">
+                Рисунок не повторяется — доска собирается одной склейкой из {plan.cols} планок.
+              </p>
+            )}
+            {analysis.symmetry.vertical && (
+              <p className="advice">
+                Рисунок зеркален по вертикали — половина планок получается переворотом
+                на 180°, поэтому щитов вдвое меньше.
+              </p>
+            )}
           </section>
 
           <section>
             <h2>Столярный чек</h2>
             <ul className="warnings">
               {!plan.valid && plan.issues.map((issue) => <li key={issue}>{issue}</li>)}
-              {plan.totals.glueUps > 8 && (
+              {plan.totals.glueUps > 8 && !analysis.block && (
                 <li>
                   {plan.totals.glueUps} щитов — это {plan.totals.glueUps} отдельных склеек.
-                  Симметричный рисунок дешевле: зеркальные колонки режутся из одного щита.
+                  Симметричный или повторяющийся рисунок обойдётся дешевле.
                 </li>
               )}
               {params.cellMm < 15 && <li>Клетка меньше 15 мм — бруски тонкие, склейка капризная.</li>}
               {plan.cols > 30 && <li>Больше 30 планок за одну склейку не стянуть: клей подгруппами.</li>}
+              {paletteTooSmall && <li>Пород меньше, чем нужно стилю — узор выйдет бедным.</li>}
             </ul>
-            {plan.valid && plan.totals.glueUps <= 8 && params.cellMm >= 15 && plan.cols <= 30 && (
+            {plan.valid && plan.totals.glueUps <= 8 && params.cellMm >= 15 && plan.cols <= 30 && !paletteTooSmall && (
               <p className="ok">Рисунок изготовим как есть.</p>
             )}
           </section>
@@ -675,6 +854,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           <section>
             <div className="row-actions">
               <button className="primary" onClick={onShare}>Скопировать ДНК</button>
+              <button onClick={onSaveFavorite}>★ Отложить</button>
             </div>
             <div className="row-actions">
               <button onClick={onPrint}>Инструкция</button>
@@ -694,4 +874,11 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
       />
     </>
   );
+}
+
+/** Пустое или нечисловое поле не должно обнулять доску — держим прежнее значение. */
+function clampInput(raw: string, min: number, max: number, fallback: number): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
 }
