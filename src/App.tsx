@@ -33,6 +33,7 @@ import {
 import { hitTestSlice, renderScene } from './render/board';
 import { PrintSheet } from './PrintSheet';
 import { useHistoryState } from './useHistoryState';
+import { MosaicStudio } from './MosaicStudio';
 import './App.css';
 
 const STORAGE_KEY = 'endgrain.recipe.v1';
@@ -75,6 +76,16 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
+  const [mode, setMode] = useState<'recipe' | 'mosaic'>(() => {
+    // ?mode=mosaic — прямая ссылка на конструктор, удобно для демо.
+    const fromQuery = new URLSearchParams(window.location.search).get('mode');
+    if (fromQuery === 'mosaic' || fromQuery === 'recipe') return fromQuery;
+    return localStorage.getItem('endgrain.mode') === 'mosaic' ? 'mosaic' : 'recipe';
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem('endgrain.mode', mode); } catch { /* приватный режим */ }
+  }, [mode]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const projection = useMemo(() => projectRecipe(recipe), [recipe]);
@@ -357,7 +368,16 @@ export default function App() {
             <p>Рисуешь не узор, а рецепт распила — всё остальное считается само</p>
           </div>
         </div>
-        <div className="topbar-actions">
+        <div className="mode-switch">
+          <button className={mode === 'recipe' ? 'on' : ''} onClick={() => setMode('recipe')}>
+            Рецепт
+          </button>
+          <button className={mode === 'mosaic' ? 'on' : ''} onClick={() => setMode('mosaic')}>
+            Мозаика
+          </button>
+        </div>
+
+        <div className="topbar-actions" hidden={mode !== 'recipe'}>
           <span className="undo-group">
             <button className="icon" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">↶</button>
             <button className="icon" onClick={redo} disabled={!canRedo} title="Вернуть (Ctrl+Shift+Z)">↷</button>
@@ -369,7 +389,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="layout">
+      {mode === 'mosaic' && <MosaicStudio oil={oil} onOilChange={setOil} />}
+
+      <main className="layout" hidden={mode !== 'recipe'}>
         <aside className="panel editor">
           <section>
             <h2>Бруски щита A</h2>
@@ -652,13 +674,13 @@ export default function App() {
 
       {toast && <div className="toast">{toast}</div>}
 
-      <PrintSheet
+      {mode === 'recipe' && <PrintSheet
         recipe={recipe}
         projection={projection}
         warnings={warnings}
         boardImage={boardImage}
         shareUrl={buildShareUrl(recipe, seed)}
-      />
+      />}
     </div>
   );
 }

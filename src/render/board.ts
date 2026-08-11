@@ -41,7 +41,7 @@ function fit(ctx: CanvasRenderingContext2D, contentW: number, contentH: number, 
 }
 
 /** Торцевая текстура: годичные кольца видны срезом, поэтому дуги, а не полосы. */
-function paintEndGrain(
+export function paintEndGrain(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
   baseColor: string, cellSeed: number

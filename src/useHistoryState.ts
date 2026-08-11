@@ -77,13 +77,19 @@ export function historyReducer<T>(state: State<T>, action: Action<T>): State<T> 
  * useState с историей: Ctrl+Z для редактора узора обязателен, без него
  * страшно жать кнопки и весь ручной режим бесполезен.
  */
-export function useHistoryState<T>(initial: T): [T, (next: T | ((current: T) => T)) => void, History] {
-  const [state, dispatch] = useReducer(historyReducer as (s: State<T>, a: Action<T>) => State<T>, {
-    past: [],
-    present: initial,
-    future: [],
-    lastWrite: 0,
-  });
+export function useHistoryState<T>(
+  initial: T | (() => T)
+): [T, (next: T | ((current: T) => T)) => void, History] {
+  const [state, dispatch] = useReducer(
+    historyReducer as (s: State<T>, a: Action<T>) => State<T>,
+    initial,
+    (seed): State<T> => ({
+      past: [],
+      present: typeof seed === 'function' ? (seed as () => T)() : seed,
+      future: [],
+      lastWrite: 0,
+    })
+  );
 
   const set = useCallback((next: T | ((current: T) => T)) => {
     dispatch({ type: 'set', value: next, now: Date.now() });

@@ -8,4 +8,6 @@ export * from './oil';
 export * from './process';
 export * from './validate';
 export * from './edit';
+export * from './mosaic';
+export * from './generators';
 export * from './defaults';
