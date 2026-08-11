@@ -11,14 +11,14 @@ export interface BoardDna {
  * каждую кириллическую букву втрое до base64, и ссылка на рецепт с русскими
  * названиями пород переваливала за 3500 символов — такие URL режут мессенджеры.
  */
-function toBase64Url(input: string): string {
+export function toBase64Url(input: string): string {
   const bytes = new TextEncoder().encode(input);
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function fromBase64Url(input: string): string {
+export function fromBase64Url(input: string): string {
   const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
   const padLength = base64.length % 4;
   const padded = padLength > 0 ? base64 + '='.repeat(4 - padLength) : base64;

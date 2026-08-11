@@ -11,4 +11,5 @@ export * from './edit';
 export * from './mosaic';
 export * from './generators';
 export * from './color';
+export * from './mosaicShare';
 export * from './defaults';

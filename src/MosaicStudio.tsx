@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GENERATORS,
   SPECIES_CATALOG,
+  buildMosaicShareUrl,
   compileMosaic,
   emptyMosaic,
   formatLength,
@@ -9,6 +10,7 @@ import {
   mosaicSize,
   paintCell,
   plural,
+  readMosaicDnaFromLocation,
   resizeMosaic,
 } from './core';
 import type { GeneratorId, Mosaic, MosaicRecipe, WoodSpecies } from './core';
@@ -87,6 +89,11 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   );
 
   const [mosaic, setMosaic, history] = useHistoryState<Mosaic>(() => {
+    // Ссылка с ДНК (#mdna=) старше query и localStorage: по ней пришли смотреть
+    // конкретный рисунок, а не свой сохранённый.
+    const fromDna = readMosaicDnaFromLocation();
+    if (fromDna) return fromDna;
+
     const start = paramsFromQuery(DEFAULT_PARAMS);
     // Ссылка с ?gen= всегда открывает свежий рисунок, иначе — сохранённый.
     if (start.generator === DEFAULT_PARAMS.generator) {
@@ -120,6 +127,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
   const [painting, setPainting] = useState(false);
   const [boardImage, setBoardImage] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPhotoRef = useRef<HTMLImageElement | null>(null);
 
@@ -276,6 +284,35 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [draw]);
+
+  const flash = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2200);
+  };
+
+  // Ссылку с ДНК могут открыть во вкладке, где студия уже запущена —
+  // меняется только hash, документ не перезагружается.
+  useEffect(() => {
+    const onHashChange = () => {
+      const fromDna = readMosaicDnaFromLocation();
+      if (!fromDna) return;
+      setMosaic(fromDna);
+      flash('Открыта ДНК мозаики из ссылки');
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [setMosaic]);
+
+  const onShare = async () => {
+    const url = buildMosaicShareUrl(mosaic);
+    try {
+      await navigator.clipboard.writeText(url);
+      flash('ДНК мозаики скопирована в буфер');
+    } catch {
+      window.location.hash = url.split('#')[1] ?? '';
+      flash('ДНК мозаики в адресной строке');
+    }
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -637,12 +674,17 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
           <section>
             <div className="row-actions">
+              <button className="primary" onClick={onShare}>Скопировать ДНК</button>
+            </div>
+            <div className="row-actions">
               <button onClick={onPrint}>Инструкция</button>
               <button onClick={onExportPng}>Отпечаток</button>
             </div>
           </section>
         </aside>
       </main>
+
+      {toast && <div className="toast">{toast}</div>}
 
       <MosaicPrintSheet
         plan={plan}
