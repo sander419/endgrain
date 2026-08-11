@@ -7,4 +7,5 @@ export * from './share';
 export * from './oil';
 export * from './process';
 export * from './validate';
+export * from './edit';
 export * from './defaults';

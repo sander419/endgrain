@@ -44,6 +44,16 @@ export function defaultRecipe(): Recipe {
 export const MM_PER_INCH = 25.4;
 export const M3_PER_BOARD_FOOT = 0.002359737216;
 
+/** Склонение по-русски: 1 планка, 2 планки, 5 планок. */
+export function plural(count: number, one: string, few: string, many: string): string {
+  const mod100 = Math.abs(count) % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
 export function formatLength(mm: number, units: 'mm' | 'inch'): string {
   if (units === 'inch') return `${(mm / MM_PER_INCH).toFixed(2)}″`;
   return `${Math.round(mm * 10) / 10} мм`;

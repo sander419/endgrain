@@ -12,13 +12,27 @@ import {
   formatLength,
   getStepHint,
   mulberry32,
+  plural,
   projectRecipe,
   randomizeWild,
   readDnaFromLocation,
 } from './core';
 import type { PresetId, ProcessStep, Recipe } from './core';
-import { renderScene } from './render/board';
+import {
+  duplicateStrip,
+  flipSlice,
+  manualSliceCount,
+  mirrorStrips,
+  moveStrip,
+  resetAllSlices,
+  resetSlice,
+  reverseStrips,
+  shiftSlice,
+  swapSlices,
+} from './core';
+import { hitTestSlice, renderScene } from './render/board';
 import { PrintSheet } from './PrintSheet';
+import { useHistoryState } from './useHistoryState';
 import './App.css';
 
 const STORAGE_KEY = 'endgrain.recipe.v1';
@@ -53,17 +67,20 @@ function initialStep(): ProcessStep {
 
 export default function App() {
   const initial = useMemo(loadInitialRecipe, []);
-  const [recipe, setRecipe] = useState<Recipe>(initial.recipe);
+  const [recipe, setRecipe, history] = useHistoryState<Recipe>(initial.recipe);
   const [seed, setSeed] = useState(initial.seed);
   const [step, setStep] = useState<ProcessStep>(initialStep);
   const [oil, setOil] = useState(0.35);
   const [explode, setExplode] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [boardImage, setBoardImage] = useState<string | null>(null);
+  const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const projection = useMemo(() => projectRecipe(recipe), [recipe]);
   const warnings = useMemo(() => checkJoinery(recipe), [recipe]);
+  const manualCount = manualSliceCount(recipe);
+  const { undo, redo, canUndo, canRedo } = history;
   const units = recipe.units;
 
   useEffect(() => {
@@ -124,8 +141,8 @@ export default function App() {
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    renderScene(ctx, recipe, projection, { step, oil, explode });
-  }, [recipe, projection, step, oil, explode]);
+    renderScene(ctx, recipe, projection, { step, oil, explode, selectedSlice });
+  }, [recipe, projection, step, oil, explode, selectedSlice]);
 
   useEffect(() => {
     draw();
@@ -136,6 +153,95 @@ export default function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, [draw]);
+
+  // Планка могла исчезнуть после смены длины щита или толщины среза.
+  useEffect(() => {
+    setSelectedSlice((current) =>
+      current !== null && current >= projection.sliceCount ? null : current
+    );
+  }, [projection.sliceCount]);
+
+  const onCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const hit = hitTestSlice(
+      ctx, recipe, projection,
+      { step, oil, explode },
+      (event.clientX - rect.left) * scaleX,
+      (event.clientY - rect.top) * scaleY
+    );
+    setSelectedSlice((current) => (hit === current ? null : hit));
+  };
+
+  const editSelected = (fn: (recipe: Recipe, sliceIndex: number) => Recipe) => {
+    if (selectedSlice === null) return;
+    setRecipe((r) => fn(r, selectedSlice));
+  };
+
+  const moveSelected = (direction: -1 | 1) => {
+    if (selectedSlice === null) return;
+    const target = selectedSlice + direction;
+    if (target < 0 || target >= projection.sliceCount) return;
+    setRecipe((r) => swapSlices(r, selectedSlice, target));
+    setSelectedSlice(target);
+  };
+
+  // Горячие клавиши: планка выбирается стрелками, правится F и скобками.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const inField = !!target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName);
+
+      // Отмена работает всегда, даже когда курсор в поле ввода.
+      if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'я')) {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+        return;
+      }
+
+      if (inField) return;
+
+      const total = projection.sliceCount;
+      if (total === 0) return;
+
+      if (event.key === 'Escape') { setSelectedSlice(null); return; }
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        const delta = event.key === 'ArrowRight' ? 1 : -1;
+        setSelectedSlice((current) => {
+          if (current === null) return delta > 0 ? 0 : total - 1;
+          return (current + delta + total) % total;
+        });
+        return;
+      }
+
+      if (selectedSlice === null) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'f' || key === 'а') {
+        event.preventDefault();
+        setRecipe((r) => flipSlice(r, selectedSlice));
+      } else if (event.key === ']' || event.key === 'ъ') {
+        event.preventDefault();
+        setRecipe((r) => shiftSlice(r, selectedSlice, 1));
+      } else if (event.key === '[' || event.key === 'х') {
+        event.preventDefault();
+        setRecipe((r) => shiftSlice(r, selectedSlice, -1));
+      } else if (key === 'r' || key === 'к') {
+        event.preventDefault();
+        setRecipe((r) => resetSlice(r, selectedSlice));
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedSlice, projection.sliceCount, setRecipe, undo, redo]);
 
   const flash = (message: string) => {
     setToast(message);
@@ -252,6 +358,10 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-actions">
+          <span className="undo-group">
+            <button className="icon" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">↶</button>
+            <button className="icon" onClick={redo} disabled={!canRedo} title="Вернуть (Ctrl+Shift+Z)">↷</button>
+          </span>
           <span className="seed" title="Один seed — один и тот же узор">seed {seed}</span>
           <button className="primary" onClick={onShare}>Скопировать ДНК доски</button>
           <button onClick={onPrint}>Инструкция для мастерской</button>
@@ -286,16 +396,39 @@ export default function App() {
                     onChange={(e) => updateStrip(index, { widthMm: Number(e.target.value) })}
                   />
                   <span className="unit">мм</span>
-                  <button
-                    className="icon"
-                    title="Убрать брусок"
-                    onClick={() => removeStrip(index)}
-                    disabled={recipe.panel.strips.length <= 1}
-                  >×</button>
+                  <span className="row-tools">
+                    <button
+                      className="icon" title="Выше"
+                      onClick={() => setRecipe((r) => moveStrip(r, index, index - 1))}
+                      disabled={index === 0}
+                    >↑</button>
+                    <button
+                      className="icon" title="Ниже"
+                      onClick={() => setRecipe((r) => moveStrip(r, index, index + 1))}
+                      disabled={index === recipe.panel.strips.length - 1}
+                    >↓</button>
+                    <button
+                      className="icon" title="Дублировать"
+                      onClick={() => setRecipe((r) => duplicateStrip(r, index))}
+                    >⧉</button>
+                    <button
+                      className="icon" title="Убрать брусок"
+                      onClick={() => removeStrip(index)}
+                      disabled={recipe.panel.strips.length <= 1}
+                    >×</button>
+                  </span>
                 </div>
               ))}
             </div>
             <button className="wide" onClick={addStrip}>+ Добавить брусок</button>
+            <div className="row-actions">
+              <button onClick={() => setRecipe(mirrorStrips)} title="A-B-C → A-B-C-C-B-A">
+                Зеркалить набор
+              </button>
+              <button onClick={() => setRecipe(reverseStrips)} title="Развернуть порядок брусков">
+                Развернуть
+              </button>
+            </div>
           </section>
 
           <section>
@@ -395,8 +528,44 @@ export default function App() {
           </div>
 
           <div className="canvas-wrap">
-            <canvas ref={canvasRef} />
+            <canvas
+              ref={canvasRef}
+              onClick={onCanvasClick}
+              className={step === 'final' || step === 'flip' ? 'pickable' : ''}
+            />
           </div>
+
+          {(step === 'final' || step === 'flip') && (
+            <div className={selectedSlice === null ? 'slice-bar empty' : 'slice-bar'}>
+              {selectedSlice === null ? (
+                <span className="slice-help">
+                  Кликни планку на доске, чтобы править её отдельно. Или стрелками ← →
+                </span>
+              ) : (
+                <>
+                  <b>Планка {selectedSlice + 1} из {projection.sliceCount}</b>
+                  <button onClick={() => editSelected(flipSlice)} title="F">Перевернуть 180°</button>
+                  <button onClick={() => editSelected((r, i) => shiftSlice(r, i, -1))} title="[">Сдвиг ←</button>
+                  <button onClick={() => editSelected((r, i) => shiftSlice(r, i, 1))} title="]">Сдвиг →</button>
+                  <button onClick={() => moveSelected(-1)} disabled={selectedSlice === 0}>Левее</button>
+                  <button
+                    onClick={() => moveSelected(1)}
+                    disabled={selectedSlice >= projection.sliceCount - 1}
+                  >Правее</button>
+                  <button onClick={() => editSelected(resetSlice)} title="R">Сбросить</button>
+                  <button className="ghost" onClick={() => setSelectedSlice(null)}>Снять выбор</button>
+                  <span className="keys">← → выбор · F переворот · [ ] сдвиг · R сброс · Ctrl+Z отмена</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {manualCount > 0 && (
+            <p className="manual-note">
+              Правлено вручную: {manualCount} {plural(manualCount, 'планка', 'планки', 'планок')}.
+              <button className="link" onClick={() => setRecipe(resetAllSlices)}>Сбросить все правки</button>
+            </p>
+          )}
 
           <p className="hint">{getStepHint(step, recipe, projection)}</p>
 

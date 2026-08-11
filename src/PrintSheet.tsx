@@ -1,5 +1,5 @@
 import type { Recipe, RecipeProjection, JoineryWarning } from './core';
-import { formatLength } from './core';
+import { formatLength, getSliceStripIndices, plural } from './core';
 
 interface Props {
   recipe: Recipe;
@@ -13,12 +13,28 @@ interface Props {
  * Печатный лист для мастерской. PDF делает сам браузер (Ctrl+P → «Сохранить как PDF»),
  * поэтому никакой jsPDF: он не умеет кириллицу без вшитого шрифта на треть мегабайта.
  */
+/**
+ * Человеческое описание планки: столяр должен понять, что делать с куском дерева,
+ * не сверяясь с индексами. Порядок как в щите — «как есть», развёрнутый — «на 180°»,
+ * всё остальное — распустить и переклеить в указанном порядке.
+ */
+function describeSlice(recipe: Recipe, row: number[], sliceIndex: number): string {
+  const natural = recipe.panel.strips.map((_, index) => index);
+  const reversed = [...natural].reverse();
+  const manual = Array.isArray(recipe.transform.manualSlices?.[sliceIndex]);
+
+  if (row.join() === natural.join()) return 'как из щита';
+  if (row.join() === reversed.join()) return 'повернуть на 180°';
+  return manual ? 'распустить и переклеить (правлено вручную)' : 'распустить и переклеить';
+}
+
 export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl }: Props) {
   const units = recipe.units;
   const dims = projection.finalDimensions;
   const cuts = Math.max(0, projection.sliceCount - 1);
   const roughLength = projection.panel.requiredRoughLengthMm;
   const roughThickness = recipe.panel.stripThicknessMm + recipe.allowances.thicknessSurfacingMm;
+  const matrix = getSliceStripIndices(recipe, projection.sliceCount);
 
   // Бруски одной породы и ширины — одна строка спецификации.
   const groups = new Map<string, { speciesId: string; widthMm: number; count: number }>();
@@ -74,7 +90,10 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
       <h2>3. Поперечный распил</h2>
       <ol>
         <li>Торцевать один край щита начисто.</li>
-        <li>Нарезать {projection.sliceCount} планок толщиной {formatLength(recipe.crosscut.sliceThicknessMm, units)}. Резов: {cuts}.</li>
+        <li>
+          Нарезать {projection.sliceCount} {plural(projection.sliceCount, 'планку', 'планки', 'планок')}{' '}
+          толщиной {formatLength(recipe.crosscut.sliceThicknessMm, units)}. Резов: {cuts}.
+        </li>
         <li>
           Пропил {formatLength(recipe.crosscut.sawKerfMm, units)} × {cuts} съедает{' '}
           {Math.round(projection.waste.crosscutKerfM3 * 1e9).toLocaleString('ru-RU')} мм³ — это заложено в расчёт.
@@ -93,6 +112,36 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
         {recipe.transform.manualSlices && <li>Порядок брусков в планках — по картинке выше.</li>}
         <li>Все планки повернуть на 90°: торцы вверх.</li>
       </ol>
+
+      <h2>Схема переклейки</h2>
+      <p className="note">
+        Бруски щита пронумерованы слева направо:{' '}
+        {recipe.panel.strips.map((strip, index) => (
+          <span key={index}>
+            {index > 0 && ', '}
+            <b>{index + 1}</b> — {recipe.species[strip.speciesId]?.name ?? strip.speciesId}
+          </span>
+        ))}
+        . В таблице — порядок брусков в каждой планке готовой доски.
+      </p>
+      <table className="scheme">
+        <thead>
+          <tr>
+            <th>Планка</th>
+            {recipe.panel.strips.map((_, index) => <th key={index}>{index + 1}</th>)}
+            <th>Как получить</th>
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.map((row, sliceIndex) => (
+            <tr key={sliceIndex}>
+              <td>{sliceIndex + 1}</td>
+              {row.map((stripIndex, position) => <td key={position}>{stripIndex + 1}</td>)}
+              <td className="how">{describeSlice(recipe, row, sliceIndex)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <h2>5. Вторая склейка</h2>
       <ol>

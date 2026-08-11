@@ -8,6 +8,16 @@ export interface RenderOptions {
   explode: number;
   /** Фон сцены. Для печати передаём белый. */
   background?: string;
+  /** Планка, выбранная для ручной правки. */
+  selectedSlice?: number | null;
+}
+
+export interface SliceRect {
+  sliceIndex: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 interface Viewport {
@@ -164,6 +174,55 @@ function renderPanelA(
 }
 
 /**
+ * Раскладка планок готовой доски. Одна функция и для отрисовки, и для попадания
+ * курсором — иначе клик уезжает от того, что нарисовано.
+ *
+ * Планки после поворота на 90° стоят колонками: длина доски идёт по X,
+ * ширина — по Y. Тот же разворот, что и на верстаке.
+ */
+export function boardLayout(
+  ctx: CanvasRenderingContext2D,
+  recipe: Recipe,
+  projection: RecipeProjection,
+  opts: RenderOptions
+): { vp: Viewport; rects: SliceRect[]; widthMm: number; totalLength: number } {
+  const count = projection.sliceCount;
+  const stripThickness = recipe.panel.stripThicknessMm;
+  const widthMm = projection.panel.netWidthMm;
+  const gapMm = opts.step === 'flip' ? 10 * opts.explode : 0;
+  const totalLength = count * stripThickness + gapMm * Math.max(0, count - 1);
+  const vp = fit(ctx, totalLength || 1, widthMm || 1, 36);
+
+  const rects: SliceRect[] = Array.from({ length: count }, (_, sliceIndex) => ({
+    sliceIndex,
+    x: vp.offsetX + sliceIndex * (stripThickness + gapMm) * vp.scale,
+    y: vp.offsetY,
+    w: stripThickness * vp.scale,
+    h: widthMm * vp.scale,
+  }));
+
+  return { vp, rects, widthMm, totalLength };
+}
+
+/**
+ * Какая планка под точкой (координаты в пикселях канваса, с учётом dpr).
+ * Работает только на этапах, где нарисована доска.
+ */
+export function hitTestSlice(
+  ctx: CanvasRenderingContext2D,
+  recipe: Recipe,
+  projection: RecipeProjection,
+  opts: RenderOptions,
+  x: number,
+  y: number
+): number | null {
+  if (opts.step !== 'final' && opts.step !== 'flip') return null;
+  const { rects } = boardLayout(ctx, recipe, projection, opts);
+  const found = rects.find((rect) => x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h);
+  return found ? found.sliceIndex : null;
+}
+
+/**
  * Готовая доска сверху: торцы. Ряд = планка, ячейка = торец бруска.
  * Используется на этапах flip / final.
  */
@@ -176,18 +235,10 @@ function renderBoard(
   const matrix = getSliceStripIndices(recipe, projection.sliceCount);
   if (matrix.length === 0) return;
 
-  // Планки после поворота на 90° стоят колонками: длина доски идёт по X,
-  // ширина — по Y. Тот же разворот, что и на верстаке.
-  const stripThickness = recipe.panel.stripThicknessMm;
-  const widthMm = projection.panel.netWidthMm;
-  const gapMm = opts.step === 'flip' ? 10 * opts.explode : 0;
-  const totalLength = matrix.length * stripThickness + gapMm * (matrix.length - 1);
-
-  const vp = fit(ctx, totalLength, widthMm, 36);
+  const { vp, rects, widthMm, totalLength } = boardLayout(ctx, recipe, projection, opts);
 
   matrix.forEach((row, sliceIndex) => {
-    const x = vp.offsetX + sliceIndex * (stripThickness + gapMm) * vp.scale;
-    const w = stripThickness * vp.scale;
+    const { x, w } = rects[sliceIndex];
     let cursorY = 0;
 
     row.forEach((stripIndex, position) => {
@@ -209,12 +260,48 @@ function renderBoard(
       ctx.lineWidth = 2;
       ctx.strokeRect(x, vp.offsetY, w, widthMm * vp.scale);
     }
+
+    // Планка, отредактированная руками, помечена уголком.
+    const manual = recipe.transform.manualSlices?.[sliceIndex];
+    if (Array.isArray(manual)) {
+      ctx.fillStyle = 'rgba(255,138,61,0.95)';
+      ctx.beginPath();
+      ctx.moveTo(x + w, vp.offsetY);
+      ctx.lineTo(x + w, vp.offsetY + Math.min(14, w));
+      ctx.lineTo(x + w - Math.min(14, w), vp.offsetY);
+      ctx.closePath();
+      ctx.fill();
+    }
   });
 
   // Общий контур доски.
   ctx.strokeStyle = 'rgba(0,0,0,0.6)';
   ctx.lineWidth = 2;
   ctx.strokeRect(vp.offsetX, vp.offsetY, totalLength * vp.scale, widthMm * vp.scale);
+
+  if (typeof opts.selectedSlice === 'number' && rects[opts.selectedSlice]) {
+    const rect = rects[opts.selectedSlice];
+    const boardHeight = widthMm * vp.scale;
+    ctx.strokeStyle = '#ff8a3d';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(rect.x - 1.5, vp.offsetY - 1.5, rect.w + 3, boardHeight + 3);
+
+    // Номер планки — чтобы понимать, где ты, когда ходишь стрелками.
+    const label = String(opts.selectedSlice + 1);
+    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const badgeW = Math.max(20, ctx.measureText(label).width + 12);
+    const badgeY = vp.offsetY + boardHeight + 12;
+    ctx.fillStyle = '#ff8a3d';
+    ctx.beginPath();
+    ctx.roundRect(rect.x + rect.w / 2 - badgeW / 2, badgeY, badgeW, 18, 9);
+    ctx.fill();
+    ctx.fillStyle = '#23150a';
+    ctx.fillText(label, rect.x + rect.w / 2, badgeY + 9);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  }
 }
 
 export function renderScene(

@@ -8,7 +8,8 @@ export type WarningId =
   | 'many_slices'
   | 'shrinkage_conflict'
   | 'flip_no_effect'
-  | 'single_species';
+  | 'single_species'
+  | 'extra_rip_cuts';
 
 export interface JoineryWarning {
   id: WarningId;
@@ -75,6 +76,21 @@ export function checkJoinery(recipe: Recipe): JoineryWarning[] {
           'Порядок пород симметричен — переворот планок ничего не меняет. Сдвинь бруски или включи циклический сдвиг.',
       });
     }
+  }
+
+  // Переворот планки на 180° — бесплатная операция: планку просто кладут другим
+  // концом. А вот сдвиг брусков внутри планки бесплатным не бывает: планка
+  // цельная, порядок брусков в ней задан щитом. Чтобы его изменить, планку
+  // распускают по клеевому шву и переклеивают — это лишние продольные резы,
+  // которых нет в расчёте отходов.
+  const shifted = recipe.transform.cyclicShiftStep !== 0;
+  const manual = (recipe.transform.manualSlices ?? []).some((row) => Array.isArray(row));
+  if ((shifted || manual) && nSlices > 0) {
+    warnings.push({
+      id: 'extra_rip_cuts',
+      message:
+        'Сдвиг брусков внутри планки — это распил планки по шву и переклейка. Либо закладывай по продольному резу на планку, либо клей второй щит с другим порядком брусков. В отходах эти резы не учтены.',
+    });
   }
 
   return warnings;

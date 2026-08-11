@@ -45,6 +45,14 @@ describe('checkJoinery', () => {
     expect(checkJoinery(recipe).map((w) => w.id)).toContain('many_slices');
   });
 
+  it('предупреждает о продольных резах при сдвиге, но не при простом перевороте', () => {
+    const base = defaultRecipe();
+    expect(checkJoinery(base).map((w) => w.id)).not.toContain('extra_rip_cuts');
+
+    const shifted = { ...base, transform: { ...base.transform, cyclicShiftStep: 1 } };
+    expect(checkJoinery(shifted).map((w) => w.id)).toContain('extra_rip_cuts');
+  });
+
   it('ловит одну породу', () => {
     const recipe = withStrips([
       { speciesId: 'oak', widthMm: 40 },
