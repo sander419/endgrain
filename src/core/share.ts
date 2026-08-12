@@ -27,13 +27,25 @@ export function fromBase64Url(input: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-/** В ссылку едут только те породы, которые реально лежат в щите. */
+/**
+ * В ссылку едут только использованные породы и только те их поля, которые
+ * пользователь мог изменить. Справочное — латинское название, твёрдость,
+ * усушка, источник — восстанавливается из каталога приложения по id: эти
+ * данные одинаковы у всех и в ссылке занимали бы больше места, чем сам рецепт.
+ */
 function pruneSpecies(recipe: Recipe): Recipe {
   const used = new Set(recipe.panel.strips.map((strip) => strip.speciesId));
   const species: Recipe['species'] = {};
   for (const id of used) {
     const found = recipe.species[id];
-    if (found) species[id] = found;
+    if (!found) continue;
+    species[id] = {
+      id: found.id,
+      name: found.name,
+      colorHex: found.colorHex,
+      densityKgM3: found.densityKgM3,
+      pricePerCubicMeter: found.pricePerCubicMeter,
+    };
   }
   return { ...recipe, species };
 }

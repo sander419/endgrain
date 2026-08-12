@@ -13,5 +13,7 @@ export * from './generators';
 export * from './color';
 export * from './mosaicShare';
 export * from './analysis';
+export * from './moisture';
+export * from './economics';
 export * from './favorites';
 export * from './defaults';

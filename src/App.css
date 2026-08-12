@@ -375,6 +375,31 @@ button.link:hover { background: none; color: var(--text); }
 .issues, .warnings { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.5; }
 .issues li { color: var(--bad); }
 .warnings li { color: var(--warn); }
+
+/* Развёрнутое предупреждение: что не так → почему → чем грозит → что делать. */
+.warnings li.warn {
+  list-style: none;
+  margin: 0 0 8px -18px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  border-left: 3px solid var(--warn);
+  background: #211a13;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text);
+}
+
+.warnings li.warn-danger { border-left-color: var(--bad); }
+.warnings li.warn-info { border-left-color: var(--muted); }
+
+.warnings li.warn b { color: var(--warn); font-size: 12px; }
+.warnings li.warn-danger b { color: var(--bad); }
+.warnings li.warn-info b { color: var(--text); }
+
+.warnings li.warn span { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.warnings li.warn i { color: var(--text); font-style: normal; font-weight: 600; }
+.warn-source { font-size: 10.5px; color: var(--muted); opacity: 0.75; font-style: italic; }
 .ok { margin: 0; color: var(--ok); font-size: 12px; }
 
 /* ── Тост ──────────────────────────────────────────── */
@@ -467,6 +492,81 @@ button.link:hover { background: none; color: var(--text); }
   line-height: 1.45;
   color: var(--text);
 }
+
+/* ── Экономика ─────────────────────────────────────── */
+
+.price-box {
+  margin: 10px 0 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2a1e14, #221a13);
+  border: 1px solid #4a3524;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.price-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.price-box .price {
+  font-size: 17px;
+  color: var(--ok);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.price-note { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+.rates {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dotted #2a211a;
+}
+
+.rates label { margin-bottom: 6px; font-size: 11.5px; }
+.rates label input { width: 76px; }
+
+/* ── Панель влажности ──────────────────────────────── */
+
+.moisture .climate-row { display: flex; gap: 8px; margin-bottom: 10px; }
+
+.moisture .climate-row label {
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  margin: 0;
+  font-size: 11px;
+}
+
+.moisture .climate-row select { width: 100%; font-size: 12px; }
+
+.moisture .emc { margin-bottom: 10px; }
+.moisture .emc dt { font-size: 11px; }
+.moisture .emc dd { font-variant-numeric: tabular-nums; font-size: 12px; }
+
+.movement { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 10px; }
+.movement th {
+  text-align: right;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 500;
+  padding-bottom: 4px;
+}
+.movement th:first-child { text-align: left; }
+.movement td { padding: 4px 0; border-bottom: 1px dotted #2a211a; }
+.movement td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+
+.advice.movement-ok { border-left-color: var(--ok); }
+.advice.movement-caution { border-left-color: var(--warn); }
+.advice.movement-danger { border-left-color: var(--bad); }
 
 /* ── Галерея избранного ────────────────────────────── */
 

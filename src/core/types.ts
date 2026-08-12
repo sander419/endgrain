@@ -1,16 +1,35 @@
 export type Units = 'mm' | 'inch';
 
+/** Откуда взято значение. Цена рыночная и сверке по справочнику не подлежит. */
+export interface SpeciesSource {
+  /** Короткое имя источника для показа рядом с цифрами. */
+  name: string;
+  url?: string;
+  /** Дата сверки в формате ISO. Данные — точка во времени, как и заметки. */
+  verifiedAt?: string;
+}
+
 export interface WoodSpecies {
   id: string;
   name: string;
+  /** Ботаническое название — чтобы «дуб» нельзя было спутать с другим дубом. */
+  scientificName?: string;
   colorHex: string;
   /** Только для расчётов, если есть проверяемые данные. */
   densityKgM3?: number;
-  /** Только для расчётов, если есть проверяемые данные. */
+  /** Твёрдость по Янка, ньютоны. Для разделочной доски — прямой критерий. */
+  jankaHardnessN?: number;
+  /** Рыночная цена, не справочная величина: зависит от поставщика и сорта. */
   pricePerCubicMeter?: number;
-  /** Опциональные данные усушки. Не выдумывать значения без источника. */
+  /**
+   * Полная усушка от точки насыщения волокна до абсолютно сухого состояния, %.
+   * Именно из этих чисел считается движение древесины (`moisture.ts`),
+   * поэтому вписывать их «на глаз» нельзя — только со сверкой по источнику.
+   */
   shrinkageRadialPct?: number;
   shrinkageTangentialPct?: number;
+  shrinkageVolumetricPct?: number;
+  source?: SpeciesSource;
 }
 
 export interface Strip {

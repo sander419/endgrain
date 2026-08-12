@@ -180,7 +180,13 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
           <h2>Столярный чек</h2>
           <ul>
             {projection.issues.map((issue) => <li key={issue}><b>Ошибка:</b> {issue}</li>)}
-            {warnings.map((w) => <li key={w.id + w.message}>{w.message}</li>)}
+            {warnings.map((w) => (
+              <li key={w.id + w.problem}>
+                <b>{w.problem}</b> {w.why} <b>Чем грозит:</b> {w.consequence}{' '}
+                <b>Что сделать:</b> {w.fix}
+                {w.source && <> <i>({w.source})</i></>}
+              </li>
+            ))}
           </ul>
         </>
       )}

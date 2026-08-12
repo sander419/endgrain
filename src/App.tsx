@@ -34,6 +34,8 @@ import { hitTestSlice, renderScene } from './render/board';
 import { PrintSheet } from './PrintSheet';
 import { useHistoryState } from './useHistoryState';
 import { MosaicStudio } from './MosaicStudio';
+import { MoisturePanel } from './MoisturePanel';
+import { EconomicsPanel } from './EconomicsPanel';
 import './App.css';
 
 const STORAGE_KEY = 'endgrain.recipe.v1';
@@ -44,7 +46,13 @@ const STORAGE_KEY = 'endgrain.recipe.v1';
  * Правки пользователя (цвет, цена) перекрывают каталог.
  */
 function withCatalog(recipe: Recipe): Recipe {
-  return { ...recipe, species: { ...SPECIES_BY_ID, ...recipe.species } };
+  // Справочные поля пород (усушка, твёрдость, источник) в ссылку не едут —
+  // подмешиваем их из каталога, а поверх кладём то, что пришло из ссылки.
+  const species: Recipe['species'] = { ...SPECIES_BY_ID };
+  for (const [id, incoming] of Object.entries(recipe.species ?? {})) {
+    species[id] = { ...SPECIES_BY_ID[id], ...incoming };
+  }
+  return { ...recipe, species };
 }
 
 function loadInitialRecipe(): { recipe: Recipe; seed: number } {
@@ -91,6 +99,17 @@ export default function App() {
   const projection = useMemo(() => projectRecipe(recipe), [recipe]);
   const warnings = useMemo(() => checkJoinery(recipe), [recipe]);
   const manualCount = manualSliceCount(recipe);
+
+  /** Ширины по породам — вход для расчёта движения древесины. */
+  const moistureUsage = useMemo(() => {
+    const bySpecies = new Map<string, { totalWidthMm: number; stripWidthMm: number }>();
+    for (const strip of recipe.panel.strips) {
+      const found = bySpecies.get(strip.speciesId);
+      if (found) found.totalWidthMm += strip.widthMm;
+      else bySpecies.set(strip.speciesId, { totalWidthMm: strip.widthMm, stripWidthMm: strip.widthMm });
+    }
+    return [...bySpecies.entries()].map(([speciesId, value]) => ({ speciesId, ...value }));
+  }, [recipe.panel.strips]);
   const { undo, redo, canUndo, canRedo } = history;
   const units = recipe.units;
 
@@ -653,6 +672,19 @@ export default function App() {
             </table>
           </section>
 
+          <EconomicsPanel
+            input={{
+              strips: recipe.panel.strips.length,
+              glueUps: 1,
+              crosscuts: cuts,
+              lengthMm: dims.topLengthMm,
+              widthMm: dims.topWidthMm,
+              materialCostRub: projection.totals.totalCost,
+            }}
+          />
+
+          <MoisturePanel usage={moistureUsage} species={recipe.species} />
+
           <section>
             <h2>Столярный чек</h2>
             {!projection.valid && (
@@ -662,7 +694,15 @@ export default function App() {
             )}
             {warnings.length > 0 && (
               <ul className="warnings">
-                {warnings.map((w) => <li key={w.id + w.message}>{w.message}</li>)}
+                {warnings.map((w) => (
+                  <li key={w.id + w.problem} className={`warn warn-${w.severity}`}>
+                    <b>{w.problem}</b>
+                    <span><i>Почему:</i> {w.why}</span>
+                    <span><i>Чем грозит:</i> {w.consequence}</span>
+                    <span><i>Что сделать:</i> {w.fix}</span>
+                    {w.source && <em className="warn-source">{w.source}</em>}
+                  </li>
+                ))}
               </ul>
             )}
             {projection.valid && warnings.length === 0 && (

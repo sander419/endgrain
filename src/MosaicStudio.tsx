@@ -33,6 +33,8 @@ import { hitTestCell, renderMosaic } from './render/mosaicBoard';
 import { textToMosaic } from './render/textMosaic';
 import { imageToMosaic } from './render/imageMosaic';
 import { MosaicPrintSheet } from './MosaicPrintSheet';
+import { MoisturePanel } from './MoisturePanel';
+import { EconomicsPanel } from './EconomicsPanel';
 import { useHistoryState } from './useHistoryState';
 
 const STORAGE_KEY = 'endgrain.mosaic.v1';
@@ -174,6 +176,28 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   const plan = useMemo(() => compileMosaic(recipe), [recipe]);
   const analysis = useMemo(() => analyseMosaic(mosaic), [mosaic]);
   const size = mosaicSize(mosaic);
+
+  /**
+   * Для мозаики «брусок» — это клетка, а суммарная ширина породы складывается
+   * из клеток одной колонки: движение доски набирается поперёк, а не по всей площади.
+   */
+  const moistureUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of mosaic.cells) {
+      const cell = row[0];
+      if (cell) counts.set(cell, (counts.get(cell) ?? 0) + 1);
+    }
+    // Если первая колонка не содержит какую-то породу, берём её по всей сетке —
+    // иначе она выпадет из отчёта.
+    for (const row of mosaic.cells) {
+      for (const cell of row) if (!counts.has(cell)) counts.set(cell, 1);
+    }
+    return [...counts.entries()].map(([speciesId, cells]) => ({
+      speciesId,
+      totalWidthMm: cells * mosaic.cellMm,
+      stripWidthMm: mosaic.cellMm,
+    }));
+  }, [mosaic]);
 
   useEffect(() => {
     try {
@@ -809,6 +833,19 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
             </dl>
           </section>
+
+          <EconomicsPanel
+            input={{
+              strips: plan.totals.stripsToPrepare,
+              glueUps: plan.totals.glueUps,
+              crosscuts: plan.totals.crosscuts,
+              lengthMm: dims.topLengthMm,
+              widthMm: dims.topWidthMm,
+              materialCostRub: plan.totals.totalCost,
+            }}
+          />
+
+          <MoisturePanel usage={moistureUsage} species={speciesMap} />
 
           <section>
             <h2>Способ сборки</h2>
