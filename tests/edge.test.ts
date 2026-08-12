@@ -9,6 +9,7 @@ import {
   applyPreset,
   encodeBoardDna,
   decodeBoardDna,
+  buildShareUrl,
   defaultRecipe,
 } from '../src/core';
 import type { Recipe } from '../src/core';
@@ -127,5 +128,25 @@ describe('Board DNA round-trip', () => {
     });
     const decoded = decodeBoardDna(encodeBoardDna({ v: 1, recipe }));
     expect(Object.keys(decoded!.recipe.species).sort()).toEqual(['maple', 'walnut']);
+  });
+
+  /**
+   * Регрессия: если у получателя ссылки в localStorage с прошлого визита
+   * стоит режим «Мозаика», страница поднимется в нём, рецепт из хэша
+   * загрузится в состояние молча, а интерфейс останется на мозаике —
+   * ссылка выглядит нерабочей. ?mode=recipe в URL закрывает это железно.
+   */
+  it('ссылка несёт ?mode=recipe — иначе застрявший режим «Мозаика» её проглотит', () => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = {
+      location: { origin: 'https://example.test', pathname: '/endgrain/' },
+    };
+    try {
+      const url = buildShareUrl(baseRecipe(), 1);
+      expect(url).toContain('?mode=recipe');
+      expect(url.indexOf('?mode=recipe')).toBeLessThan(url.indexOf('#dna='));
+    } finally {
+      (globalThis as { window?: unknown }).window = originalWindow;
+    }
   });
 });

@@ -121,6 +121,13 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     [params.paletteIds]
   );
 
+  // Не совпадает ли текущая мозаика с тем, что рисует выбранный стиль —
+  // например, после загрузки чужой ДНК-ссылки, надписи или фото. Без этого
+  // подсветка на вкладке «Стиль» врёт: показывает «Рельеф», пока на доске
+  // явно что-то другое. Читаем ДНК из хэша ещё раз — функция чистая
+  // и дешёвая, зато не нужно дёргать setState из чужого инициализатора.
+  const [customLoaded, setCustomLoaded] = useState(() => readMosaicDnaFromLocation() !== null);
+
   const [mosaic, setMosaic, history] = useHistoryState<Mosaic>(() => {
     // Ссылка с ДНК (#mdna=) старше query и localStorage: по ней пришли смотреть
     // конкретный рисунок, а не свой сохранённый.
@@ -217,6 +224,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
         .sort(byLightness)
         .map((s) => s.id);
       setMosaic(generateMosaic(next.generator, { ...next, palette: ordered }));
+      setCustomLoaded(false);
     },
     [setMosaic]
   );
@@ -255,6 +263,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           foreground: palette[palette.length - 1] ?? 'wenge',
         })
       );
+      setCustomLoaded(true);
     },
     [setMosaic, params.rows, params.cols, params.cellMm, palette]
   );
@@ -273,6 +282,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           })
         );
         setPhotoError(null);
+        setCustomLoaded(true);
       } catch {
         setPhotoError('Не получилось разобрать изображение.');
       }
@@ -348,6 +358,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
       const fromDna = readMosaicDnaFromLocation();
       if (!fromDna) return;
       setMosaic(fromDna);
+      setCustomLoaded(true);
       flash('Открыта ДНК мозаики из ссылки');
     };
     window.addEventListener('hashchange', onHashChange);
@@ -464,6 +475,12 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
         <aside className="panel editor">
           {tab === 'style' && (
             <>
+              {customLoaded && (
+                <p className="note-small custom-loaded">
+                  На доске рисунок не из этого списка — из ссылки, текста, фото или кисти.
+                  Выбери стиль ниже, чтобы заменить его.
+                </p>
+              )}
               {FAMILY_ORDER.map((family) => (
                 <section key={family}>
                   <h2>{FAMILY_NAMES[family]}</h2>
@@ -471,7 +488,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
                     {GENERATORS.filter((item) => item.family === family).map((item) => (
                       <button
                         key={item.id}
-                        className={params.generator === item.id ? 'on' : ''}
+                        className={!customLoaded && params.generator === item.id ? 'on' : ''}
                         title={item.tagline}
                         onClick={() => patchStyle({ generator: item.id })}
                       >
@@ -484,7 +501,11 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
               <section>
                 <h2>Настройка стиля</h2>
-                <p className="note-small style-tagline">{meta?.tagline}</p>
+                <p className="note-small style-tagline">
+                  {customLoaded
+                    ? 'Ручки ниже применяются к последнему выбранному стилю, не к текущей картинке.'
+                    : meta?.tagline}
+                </p>
 
                 {meta?.controls.map((control) => (
                   <label key={control.key}>

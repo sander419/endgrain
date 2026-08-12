@@ -60,7 +60,11 @@ export function decodeMosaicDna(dna: MosaicDna): Mosaic | null {
 export function buildMosaicShareUrl(mosaic: Mosaic): string {
   if (typeof window === 'undefined') return '';
   const code = toBase64Url(JSON.stringify(encodeMosaicDna(mosaic)));
-  return `${window.location.origin}${window.location.pathname}#mdna=${code}`;
+  // ?mode=mosaic обязателен: режим выбирается по localStorage/query ДО того,
+  // как что-либо читает hash. У человека, который открывает ссылку впервые,
+  // localStorage пуст, страница поднимается в режиме «Рецепт», компонент
+  // мозаики не монтируется — и #mdna из хэша некому прочитать.
+  return `${window.location.origin}${window.location.pathname}?mode=mosaic#mdna=${code}`;
 }
 
 export function readMosaicDnaFromLocation(): Mosaic | null {

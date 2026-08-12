@@ -37,4 +37,27 @@ describe('mosaic DNA round-trip', () => {
   it('buildMosaicShareUrl отдаёт пустую строку без window (SSR-заглушка)', () => {
     expect(typeof buildMosaicShareUrl(emptyMosaic(1, 1, 'maple', 25))).toBe('string');
   });
+
+  /**
+   * Регрессия: ссылка без ?mode=mosaic открывается в режиме «Рецепт» (дефолт
+   * при пустом localStorage), MosaicStudio не монтируется, и #mdna из хэша
+   * читать некому — для нового посетителя ссылка выглядит нерабочей.
+   *
+   * Тесты по умолчанию идут без DOM (environment: node, window === undefined,
+   * buildMosaicShareUrl честно отдаёт '' — проверено тестом выше). Здесь
+   * подставляем минимальный window вручную, только с тем, что читает функция.
+   */
+  it('ссылка несёт ?mode=mosaic — иначе новый посетитель откроет рецепт, а не мозаику', () => {
+    const originalWindow = (globalThis as { window?: unknown }).window;
+    (globalThis as { window?: unknown }).window = {
+      location: { origin: 'https://example.test', pathname: '/endgrain/' },
+    };
+    try {
+      const url = buildMosaicShareUrl(emptyMosaic(3, 3, 'maple', 25));
+      expect(url).toContain('?mode=mosaic');
+      expect(url.indexOf('?mode=mosaic')).toBeLessThan(url.indexOf('#mdna='));
+    } finally {
+      (globalThis as { window?: unknown }).window = originalWindow;
+    }
+  });
 });

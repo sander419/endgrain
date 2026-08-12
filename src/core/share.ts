@@ -68,7 +68,11 @@ export function decodeBoardDna(code: string): BoardDna | null {
 export function buildShareUrl(recipe: Recipe, seed?: number): string {
   if (typeof window === 'undefined') return '';
   const dna = encodeBoardDna({ v: 1, seed, recipe });
-  return `${window.location.origin}${window.location.pathname}#dna=${dna}`;
+  // ?mode=recipe обязателен: если у получателя ссылки в localStorage с прошлого
+  // визита стоит режим «Мозаика», страница поднимется в нём, а рецепт из хэша
+  // загрузится в состояние молча — интерфейс останется на мозаике, будто
+  // ссылка не сработала.
+  return `${window.location.origin}${window.location.pathname}?mode=recipe#dna=${dna}`;
 }
 
 export function readDnaFromLocation(): BoardDna | null {
