@@ -1,6 +1,15 @@
 # End-Grain Compiler
 
-**Живая версия: [hiborg-space.ru/endgrain/](https://hiborg-space.ru/endgrain/)**
+**Живая версия: [hiborg-space.ru/endgrain/](https://hiborg-space.ru/endgrain/)** ·
+Исходники: [github.com/sander419/endgrain](https://github.com/sander419/endgrain)
+
+Работает без установки и без сервера: открыл ссылку — можно проектировать.
+Быстрые ссылки для знакомства:
+[мозаика-мандала](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala) ·
+[пейзаж](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=landscape) ·
+[лабиринт](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=maze) ·
+[надпись](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%94%D0%9E%D0%9C) ·
+[инструкция для мастерской](https://hiborg-space.ru/endgrain/?mode=recipe&print=1)
 
 **Рисуешь не узор, а рецепт распила — всё остальное считается само.**
 
@@ -199,7 +208,7 @@ React 19 + TypeScript + Vite, Canvas 2D, Vitest. Ни бэкенда, ни ак�
 
 ## Деплой
 
-Статика (`npm run build` → `dist/`), задеплоена на VPS Саши как подпуть `hiborg-space.ru/endgrain/`
+Статика (`npm run build` → `dist/`), задеплоена на VPS как подпуть `hiborg-space.ru/endgrain/`
 (nginx `alias`, конфиг вне этого репозитория). `vite.config.ts` собирает с `base: './'` — без
 этого абсолютные пути на `/assets/` резолвились бы от корня домена, а не от `/endgrain/`, и все
-скрипты/стили давали бы 404. GitHub-репозитория для этого проекта нет — только локальный git.
+скрипты/стили давали бы 404.
