@@ -11,6 +11,17 @@
 [надпись](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%94%D0%9E%D0%9C) ·
 [инструкция для мастерской](https://hiborg-space.ru/endgrain/?mode=recipe&print=1)
 
+## Примеры
+
+Каждая ссылка — не картинка, а полный проект: рецепт, порядок операций, себестоимость.
+Открывается сразу в нужном рисунке — Board DNA целиком в URL, без сервера и без базы.
+
+| | |
+|---|---|
+| [Зеркальный каньон](https://hiborg-space.ru/endgrain/?mode=recipe#dna=eyJ2IjoxLCJzZWVkIjoxLCJyZWNpcGUiOnsidW5pdHMiOiJtbSIsInNwZWNpZXMiOnsibWFwbGUiOnsiaWQiOiJtYXBsZSIsIm5hbWUiOiLQmtC70ZHQvSIsImNvbG9ySGV4IjoiI0U4QzlBMCIsImRlbnNpdHlLZ00zIjo3MDUsInByaWNlUGVyQ3ViaWNNZXRlciI6OTUwMDB9LCJ3YWxudXQiOnsiaWQiOiJ3YWxudXQiLCJuYW1lIjoi0J7RgNC10YUiLCJjb2xvckhleCI6IiM1QjQwMzQiLCJkZW5zaXR5S2dNMyI6NjEwLCJwcmljZVBlckN1YmljTWV0ZXIiOjE5MDAwMH19LCJwYW5lbCI6eyJzdHJpcHMiOlt7InNwZWNpZXNJZCI6Im1hcGxlIiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoid2FsbnV0Iiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoibWFwbGUiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJ3YWxudXQiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJtYXBsZSIsIndpZHRoTW0iOjQwfSx7InNwZWNpZXNJZCI6IndhbG51dCIsIndpZHRoTW0iOjQwfV0sInN0cmlwVGhpY2tuZXNzTW0iOjQwLCJ1c2FibGVMZW5ndGhNbSI6NjAwfSwiY3Jvc3NjdXQiOnsic2xpY2VUaGlja25lc3NNbSI6NDAsInNhd0tlcmZNbSI6MywiYmxhZGVBbmdsZURlZyI6OTB9LCJ0cmFuc2Zvcm0iOnsiZmxpcE9kZFNsaWNlcyI6ZmFsc2UsImN5Y2xpY1NoaWZ0U3RlcCI6MCwibWFudWFsU2xpY2VzIjpbWzAsMSwyLDMsNCw1XSxbMSwyLDMsNCw1LDBdLFsyLDMsNCw1LDAsMV0sWzMsNCw1LDAsMSwyXSxbNCw1LDAsMSwyLDNdLFs1LDAsMSwyLDMsNF0sWzAsMSwyLDMsNCw1XSxbMCwxLDIsMyw0LDVdLFs1LDAsMSwyLDMsNF0sWzQsNSwwLDEsMiwzXSxbMyw0LDUsMCwxLDJdLFsyLDMsNCw1LDAsMV0sWzEsMiwzLDQsNSwwXSxbMCwxLDIsMyw0LDVdXX0sImFsbG93YW5jZXMiOnsidGhpY2tuZXNzU3VyZmFjaW5nTW0iOjMsInN0cmlwV2lkdGhKb2ludE1tIjoyLCJwYW5lbEVuZFRyaW1NbSI6MzB9fX0) — режим «Рецепт», клён/орех, ручная раскладка планок. 560×240×40, отходы 21.1% |
+| [Мандала «Рельеф»](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala) — режим «Мозаика», 4 породы, 21×21 клетка. 11 щитов, 231 брусок |
+| [Надпись «ХИБОРГ»](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93) — текст в клетках, клён/венге. 5 щитов, 105 брусков |
+
 **Рисуешь не узор, а рецепт распила — всё остальное считается само.**
 
 Инструмент проектирования торцевых разделочных досок. Не рисовалка квадратов:
