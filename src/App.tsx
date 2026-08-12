@@ -36,6 +36,7 @@ import { useHistoryState } from './useHistoryState';
 import { MosaicStudio } from './MosaicStudio';
 import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
+import { WorkshopPanel } from './WorkshopPanel';
 import './App.css';
 
 const STORAGE_KEY = 'endgrain.recipe.v1';
@@ -671,6 +672,8 @@ export default function App() {
               </tbody>
             </table>
           </section>
+
+          <WorkshopPanel />
 
           <EconomicsPanel
             input={{

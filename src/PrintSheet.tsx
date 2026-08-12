@@ -2,6 +2,7 @@ import type { Recipe, RecipeProjection, JoineryWarning } from './core';
 import {
   CLIMATE_PRESETS,
   analyseMovement,
+  assessWorkshop,
   calculateEconomics,
   formatDuration,
   formatLength,
@@ -9,6 +10,7 @@ import {
   loadWorkshopRates,
   plural,
 } from './core';
+import { loadTools } from './WorkshopPanel';
 
 interface Props {
   recipe: Recipe;
@@ -82,6 +84,10 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
   );
 
   const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
+
+  // Порядок работ переписан под набор станков, отмеченный в приложении:
+  // инструкция под чужую мастерскую бесполезна.
+  const workshop = assessWorkshop(loadTools());
 
   return (
     <div className="print-sheet">
@@ -228,6 +234,23 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
           </ul>
         </>
       )}
+
+      <h2>Порядок работ под твою мастерскую</h2>
+      {workshop.workarounds.length > 0 && (
+        <p className="note">
+          {workshop.workarounds.length}{' '}
+          {workshop.workarounds.length === 1 ? 'шаг идёт' : 'шага идут'} обходным путём —
+          заложи примерно на {Math.round((workshop.timeMultiplier - 1) * 100)}% больше времени.
+        </p>
+      )}
+      <ol>
+        {workshop.steps.map((step) => (
+          <li key={step.plan.id}>
+            <b>{step.plan.title}.</b> {step.instruction}
+            {step.blocked && <> <b>Нечем сделать этим набором инструмента.</b></>}
+          </li>
+        ))}
+      </ol>
 
       <h2>Движение древесины</h2>
       <p className="note">

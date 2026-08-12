@@ -15,5 +15,6 @@ export * from './mosaicShare';
 export * from './analysis';
 export * from './moisture';
 export * from './economics';
+export * from './workshop';
 export * from './favorites';
 export * from './defaults';

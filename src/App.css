@@ -493,6 +493,32 @@ button.link:hover { background: none; color: var(--text); }
   color: var(--text);
 }
 
+/* ── Мастерская ────────────────────────────────────── */
+
+.steps-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.steps-list li { margin-bottom: 7px; color: var(--muted); }
+.steps-list li b { color: var(--text); font-size: 12px; }
+.steps-list li span { display: block; margin-top: 2px; }
+
+.steps-list li em {
+  font-style: normal;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 6px;
+  color: var(--warn);
+}
+
+.steps-list li.blocked b { color: var(--bad); }
+.steps-list li.blocked em { color: var(--bad); }
+.steps-list li.workaround b { color: var(--warn); }
+
 /* ── Экономика ─────────────────────────────────────── */
 
 .price-box {
