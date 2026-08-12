@@ -1,5 +1,14 @@
 import type { Recipe, RecipeProjection, JoineryWarning } from './core';
-import { formatLength, getSliceStripIndices, plural } from './core';
+import {
+  CLIMATE_PRESETS,
+  analyseMovement,
+  calculateEconomics,
+  formatDuration,
+  formatLength,
+  getSliceStripIndices,
+  loadWorkshopRates,
+  plural,
+} from './core';
 
 interface Props {
   recipe: Recipe;
@@ -44,6 +53,35 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
     if (found) found.count += 1;
     else groups.set(key, { speciesId: strip.speciesId, widthMm: strip.widthMm, count: 1 });
   }
+
+  const economics = calculateEconomics(
+    {
+      strips: recipe.panel.strips.length,
+      glueUps: 1,
+      crosscuts: cuts,
+      lengthMm: dims.topLengthMm,
+      widthMm: dims.topWidthMm,
+      materialCostRub: projection.totals.totalCost,
+    },
+    loadWorkshopRates()
+  );
+
+  // Движение считаем между сборкой в зимней мастерской и худшими условиями
+  // на кухне — именно этот перепад и рвёт клеевые швы.
+  const shopClimate = CLIMATE_PRESETS.find((p) => p.id === 'shop-winter')!.climate;
+  const kitchenClimate = CLIMATE_PRESETS.find((p) => p.id === 'kitchen-humid')!.climate;
+  const movement = analyseMovement(
+    [...groups.values()].map((group) => ({
+      speciesId: group.speciesId,
+      totalWidthMm: group.widthMm * group.count,
+      stripWidthMm: group.widthMm,
+    })),
+    recipe.species,
+    shopClimate,
+    kitchenClimate
+  );
+
+  const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
   return (
     <div className="print-sheet">
@@ -190,6 +228,55 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
           </ul>
         </>
       )}
+
+      <h2>Движение древесины</h2>
+      <p className="note">
+        Из мастерской ({shopClimate.temperatureC} °C, {shopClimate.relativeHumidityPct}%) на кухню
+        во время готовки ({kitchenClimate.temperatureC} °C, {kitchenClimate.relativeHumidityPct}%)
+        влажность древесины меняется с {movement.from.moisturePct.toFixed(1)}% до{' '}
+        {movement.to.moisturePct.toFixed(1)}%. Расчёт по USDA Wood Handbook, гл. 4 и 13;
+        показано тангенциальное направление — худший случай.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Порода</th><th>Брусок</th><th>Суммарно по ширине</th></tr>
+        </thead>
+        <tbody>
+          {movement.perSpecies.filter((item) => item.hasData).map((item) => {
+            const group = [...groups.values()].find((g) => g.speciesId === item.speciesId);
+            const total = group ? Math.abs(item.tangentialMm!) * group.count : 0;
+            return (
+              <tr key={item.speciesId}>
+                <td>{item.speciesName}</td>
+                <td>{Math.abs(item.tangentialMm!).toFixed(2)} мм</td>
+                <td>{total.toFixed(1)} мм</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {movement.mismatchBetween && movement.worstMismatchMm > 0.12 && (
+        <p className="note">
+          <b>Внимание:</b> {movement.mismatchBetween[0]} двигается сильнее, чем{' '}
+          {movement.mismatchBetween[1]}, на {movement.worstMismatchMm.toFixed(2)} мм на каждом
+          бруске. Держи готовую доску промасленной и не ставь её к источникам тепла и влаги.
+        </p>
+      )}
+
+      <h2>Экономика</h2>
+      <table>
+        <tbody>
+          <tr><td>Время работы (оценка)</td><td>{formatDuration(economics.time.totalMin)}</td></tr>
+          <tr><td>Материал</td><td>{money(economics.materialRub)}</td></tr>
+          <tr><td>Расходники и электричество</td><td>{money(economics.consumablesRub + economics.utilitiesRub)}</td></tr>
+          <tr><td>Труд и накладные</td><td>{money(economics.labourRub + economics.overheadRub)}</td></tr>
+          <tr className="total"><td>Себестоимость</td><td>{money(economics.costRub)}</td></tr>
+          <tr className="total">
+            <td>Цена продажи</td>
+            <td>{money(economics.priceRangeRub[0])} — {money(economics.priceRangeRub[1])}</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2>Чек-лист сборки</h2>
       <ul className="checklist">

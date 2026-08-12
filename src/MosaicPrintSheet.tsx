@@ -1,5 +1,12 @@
 import type { MosaicPlan, WoodSpecies } from './core';
-import { plural } from './core';
+import {
+  CLIMATE_PRESETS,
+  analyseMovement,
+  calculateEconomics,
+  formatDuration,
+  loadWorkshopRates,
+  plural,
+} from './core';
 
 interface Props {
   plan: MosaicPlan;
@@ -27,6 +34,33 @@ export function MosaicPrintSheet({ plan, species, cellMm, boardImage }: Props) {
   assembly.sort((a, b) => a.col - b.col);
 
   const piecesTotal = plan.materials.reduce((sum, material) => sum + material.pieces, 0);
+
+  const economics = calculateEconomics(
+    {
+      strips: plan.totals.stripsToPrepare,
+      glueUps: plan.totals.glueUps,
+      crosscuts: plan.totals.crosscuts,
+      lengthMm: dims.topLengthMm,
+      widthMm: dims.topWidthMm,
+      materialCostRub: plan.totals.totalCost,
+    },
+    loadWorkshopRates()
+  );
+
+  const shopClimate = CLIMATE_PRESETS.find((p) => p.id === 'shop-winter')!.climate;
+  const kitchenClimate = CLIMATE_PRESETS.find((p) => p.id === 'kitchen-humid')!.climate;
+  const movement = analyseMovement(
+    plan.materials.map((material) => ({
+      speciesId: material.speciesId,
+      totalWidthMm: cellMm * plan.rows,
+      stripWidthMm: cellMm,
+    })),
+    species,
+    shopClimate,
+    kitchenClimate
+  );
+
+  const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
   return (
     <div className="print-sheet">
@@ -86,7 +120,7 @@ export function MosaicPrintSheet({ plan, species, cellMm, boardImage }: Props) {
           {plan.panels.map((panel) => (
             <tr key={panel.index}>
               <td>{panel.index}</td>
-              <td className="how">{panel.order.map(name).join(' · ')}</td>
+              <td className="order-list">{panel.order.map(name).join(' · ')}</td>
               <td>{panel.slices}</td>
               <td>{Math.round(panel.roughLengthMm)} мм</td>
             </tr>
@@ -132,6 +166,32 @@ export function MosaicPrintSheet({ plan, species, cellMm, boardImage }: Props) {
         <li>Склеить, стянуть струбцинами, следить за плоскостностью.</li>
         <li>Рейсмус или шлифовка до {Math.round(dims.thicknessMm)} мм, фаска, масло.</li>
       </ol>
+
+      <h2>Движение древесины и экономика</h2>
+      <p className="note">
+        Из мастерской ({shopClimate.temperatureC} °C, {shopClimate.relativeHumidityPct}%) на кухню
+        во время готовки ({kitchenClimate.temperatureC} °C, {kitchenClimate.relativeHumidityPct}%)
+        влажность древесины меняется с {movement.from.moisturePct.toFixed(1)}% до{' '}
+        {movement.to.moisturePct.toFixed(1)}%: клетка {cellMm} мм двигается на десятые доли
+        миллиметра, и разница между породами ложится на клеевые швы.
+        {movement.mismatchBetween && movement.worstMismatchMm > 0.12 && (
+          <> Сильнее всех — {movement.mismatchBetween[0]}, расхождение с{' '}
+          {movement.mismatchBetween[1]} составляет {movement.worstMismatchMm.toFixed(2)} мм
+          на клетку.</>
+        )}
+      </p>
+      <table>
+        <tbody>
+          <tr><td>Время работы (оценка)</td><td>{formatDuration(economics.time.totalMin)}</td></tr>
+          <tr><td>Материал</td><td>{money(economics.materialRub)}</td></tr>
+          <tr><td>Труд и накладные</td><td>{money(economics.labourRub + economics.overheadRub)}</td></tr>
+          <tr className="total"><td>Себестоимость</td><td>{money(economics.costRub)}</td></tr>
+          <tr className="total">
+            <td>Цена продажи</td>
+            <td>{money(economics.priceRangeRub[0])} — {money(economics.priceRangeRub[1])}</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2>Чек-лист</h2>
       <ul className="checklist">

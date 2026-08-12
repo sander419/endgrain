@@ -1,19 +1,9 @@
 import { useMemo, useState } from 'react';
-import { DEFAULT_RATES, calculateEconomics, formatDuration } from './core';
+import { calculateEconomics, formatDuration, loadWorkshopRates, saveWorkshopRates } from './core';
 import type { ProductionInput, WorkshopRates } from './core';
-
-const STORAGE_KEY = 'endgrain.rates.v1';
 
 interface Props {
   input: ProductionInput;
-}
-
-function loadRates(): WorkshopRates {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return { ...DEFAULT_RATES, ...(JSON.parse(saved) as WorkshopRates) };
-  } catch { /* дефолт */ }
-  return DEFAULT_RATES;
 }
 
 /**
@@ -21,7 +11,7 @@ function loadRates(): WorkshopRates {
  * изделия, основное съедает время, поэтому показываем и его тоже.
  */
 export function EconomicsPanel({ input }: Props) {
-  const [rates, setRates] = useState<WorkshopRates>(loadRates);
+  const [rates, setRates] = useState<WorkshopRates>(loadWorkshopRates);
   const [open, setOpen] = useState(false);
 
   const economics = useMemo(() => calculateEconomics(input, rates), [input, rates]);
@@ -29,7 +19,7 @@ export function EconomicsPanel({ input }: Props) {
   const patch = (changes: Partial<WorkshopRates>) => {
     setRates((current) => {
       const next = { ...current, ...changes };
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* приватный режим */ }
+      saveWorkshopRates(next);
       return next;
     });
   };

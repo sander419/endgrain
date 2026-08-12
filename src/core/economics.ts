@@ -52,6 +52,30 @@ export const DEFAULT_RATES: WorkshopRates = {
   targetMarginPct: 100,
 };
 
+export const RATES_STORAGE_KEY = 'endgrain.rates.v1';
+
+/**
+ * Ставки читаются из localStorage и панелью, и печатным листом: в бумагу
+ * должны попасть те же цифры, что человек видел на экране, а не дефолтные.
+ */
+export function loadWorkshopRates(): WorkshopRates {
+  try {
+    const saved = localStorage.getItem(RATES_STORAGE_KEY);
+    if (saved) return { ...DEFAULT_RATES, ...(JSON.parse(saved) as WorkshopRates) };
+  } catch {
+    /* приватный режим или битые данные — берём дефолт */
+  }
+  return DEFAULT_RATES;
+}
+
+export function saveWorkshopRates(rates: WorkshopRates): void {
+  try {
+    localStorage.setItem(RATES_STORAGE_KEY, JSON.stringify(rates));
+  } catch {
+    /* приватный режим — ставки просто не переживут перезагрузку */
+  }
+}
+
 export interface ProductionInput {
   /** Сколько брусков готовим (по всем щитам). */
   strips: number;
