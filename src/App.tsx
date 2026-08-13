@@ -37,6 +37,7 @@ import { MosaicStudio } from './MosaicStudio';
 import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
 import { WorkshopPanel } from './WorkshopPanel';
+import { Icon } from './Icon';
 import './App.css';
 
 const STORAGE_KEY = 'endgrain.recipe.v1';
@@ -86,10 +87,12 @@ export default function App() {
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
   const [mode, setMode] = useState<'recipe' | 'mosaic'>(() => {
-    // ?mode=mosaic — прямая ссылка на конструктор, удобно для демо.
+    // ?mode=recipe — прямая ссылка на классический конструктор.
     const fromQuery = new URLSearchParams(window.location.search).get('mode');
     if (fromQuery === 'mosaic' || fromQuery === 'recipe') return fromQuery;
-    return localStorage.getItem('endgrain.mode') === 'mosaic' ? 'mosaic' : 'recipe';
+    // Мозаика — то, чем этот инструмент отличается от любой рисовалки шахматки:
+    // первый экран для нового посетителя должен показывать именно её.
+    return localStorage.getItem('endgrain.mode') === 'recipe' ? 'recipe' : 'mosaic';
   });
 
   useEffect(() => {
@@ -382,7 +385,12 @@ export default function App() {
     <div className={printPreview ? 'app show-print' : 'app'}>
       <header className="topbar">
         <div className="brand">
-          <span className="logo">▨</span>
+          <svg className="logo" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+            <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--accent)" />
+            <circle cx="16" cy="16" r="11" fill="none" stroke="#23150a" strokeWidth="1.6" opacity="0.55" />
+            <circle cx="16" cy="16" r="7.2" fill="none" stroke="#23150a" strokeWidth="1.6" opacity="0.7" />
+            <circle cx="16" cy="16" r="3.4" fill="#23150a" opacity="0.85" />
+          </svg>
           <div>
             <h1>End-Grain Compiler</h1>
             <p>Рисуешь не узор, а рецепт распила — всё остальное считается само</p>
@@ -390,10 +398,10 @@ export default function App() {
         </div>
         <div className="mode-switch">
           <button className={mode === 'recipe' ? 'on' : ''} onClick={() => setMode('recipe')}>
-            Рецепт
+            <Icon name="saw" size={13} />Рецепт
           </button>
           <button className={mode === 'mosaic' ? 'on' : ''} onClick={() => setMode('mosaic')}>
-            Мозаика
+            <Icon name="grid" size={13} />Мозаика
           </button>
         </div>
 
@@ -403,9 +411,9 @@ export default function App() {
             <button className="icon" onClick={redo} disabled={!canRedo} title="Вернуть (Ctrl+Shift+Z)">↷</button>
           </span>
           <span className="seed" title="Один seed — один и тот же узор">seed {seed}</span>
-          <button className="primary" onClick={onShare}>Скопировать ДНК доски</button>
-          <button onClick={onPrint}>Инструкция для мастерской</button>
-          <button onClick={onExportPng}>Снять отпечаток</button>
+          <button className="primary" onClick={onShare}><Icon name="link" size={14} />Скопировать ДНК доски</button>
+          <button onClick={onPrint}><Icon name="print" size={14} />Инструкция для мастерской</button>
+          <button onClick={onExportPng}><Icon name="download" size={14} />Снять отпечаток</button>
         </div>
       </header>
 
@@ -414,7 +422,7 @@ export default function App() {
       <main className="layout" hidden={mode !== 'recipe'}>
         <aside className="panel editor">
           <section>
-            <h2>Бруски щита A</h2>
+            <h2><Icon name="board" />Бруски щита A</h2>
             <div className="strips">
               {recipe.panel.strips.map((strip, index) => (
                 <div className="strip-row" key={index}>
@@ -474,7 +482,7 @@ export default function App() {
           </section>
 
           <section>
-            <h2>Размеры</h2>
+            <h2><Icon name="ruler" />Размеры</h2>
             <label>
               Толщина брусков
               <input
@@ -510,7 +518,7 @@ export default function App() {
           </section>
 
           <section>
-            <h2>Трансформация</h2>
+            <h2><Icon name="rotate" />Трансформация</h2>
             <label className="checkbox">
               <input
                 type="checkbox"
@@ -530,7 +538,7 @@ export default function App() {
           </section>
 
           <section>
-            <h2>Пресеты</h2>
+            <h2><Icon name="grid" />Пресеты</h2>
             <div className="presets">
               {PRESETS.map((preset) => (
                 <button key={preset.id} title={preset.tagline} onClick={() => onPreset(preset.id)}>
@@ -624,7 +632,7 @@ export default function App() {
 
         <aside className="panel report">
           <section>
-            <h2>Готовая доска</h2>
+            <h2><Icon name="board" />Готовая доска</h2>
             <div className="big">
               {formatLength(dims.topLengthMm, units)} × {formatLength(dims.topWidthMm, units)} × {formatLength(dims.thicknessMm, units)}
             </div>
@@ -636,8 +644,8 @@ export default function App() {
             </dl>
           </section>
 
-          <section>
-            <h2>Материал и отходы</h2>
+          <section className="dom-material">
+            <h2><Icon name="layers" />Материал и отходы</h2>
             <dl>
               <div><dt>Сырой объём</dt><dd>{projection.totals.rawVolumeM3.toFixed(5)} м³</dd></div>
               <div><dt>В доске</dt><dd>{projection.totals.netVolumeM3.toFixed(5)} м³</dd></div>
@@ -649,8 +657,8 @@ export default function App() {
             </dl>
           </section>
 
-          <section>
-            <h2>По породам</h2>
+          <section className="dom-material">
+            <h2><Icon name="swatch" />По породам</h2>
             <table className="materials">
               <tbody>
                 {projection.materials
@@ -689,7 +697,7 @@ export default function App() {
           <MoisturePanel usage={moistureUsage} species={recipe.species} />
 
           <section>
-            <h2>Столярный чек</h2>
+            <h2><Icon name="shield" />Столярный чек</h2>
             {!projection.valid && (
               <ul className="issues">
                 {projection.issues.map((issue) => <li key={issue}>{issue}</li>)}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CLIMATE_PRESETS, analyseMovement, equilibriumMoisturePct } from './core';
 import type { Climate, WoodSpecies } from './core';
+import { Icon } from './Icon';
 
 interface Props {
   /** Что и в какой ширине лежит в доске. */
@@ -33,8 +34,8 @@ export function MoisturePanel({ usage, species }: Props) {
   const risk = report.worstMismatchMm > 0.25 ? 'danger' : report.worstMismatchMm > 0.12 ? 'caution' : 'ok';
 
   return (
-    <section className="moisture">
-      <h2>Движение древесины</h2>
+    <section className="moisture dom-water">
+      <h2><Icon name="droplet" />Движение древесины</h2>
 
       <div className="climate-row">
         <label>

@@ -35,20 +35,30 @@ import { imageToMosaic } from './render/imageMosaic';
 import { MosaicPrintSheet } from './MosaicPrintSheet';
 import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
+import { WorkshopPanel } from './WorkshopPanel';
 import { useHistoryState } from './useHistoryState';
+import { Icon } from './Icon';
+import type { IconName } from './Icon';
 
 const STORAGE_KEY = 'endgrain.mosaic.v1';
 
 /** Вкладки: у каждой свой набор инструментов и свой вид превью. */
 type Tab = 'style' | 'draw' | 'board' | 'plan' | 'saved';
 
-const TABS: { id: Tab; label: string; hint: string }[] = [
-  { id: 'style', label: 'Стиль', hint: 'Выбрать узор и покрутить его параметры' },
-  { id: 'draw', label: 'Рисовать', hint: 'Кисть, текст, своё фото' },
-  { id: 'board', label: 'Доска', hint: 'Размер сетки, породы, толщина' },
-  { id: 'plan', label: 'Производство', hint: 'Щиты, материал, отходы' },
-  { id: 'saved', label: 'Избранное', hint: 'Отложенные варианты' },
+const TABS: { id: Tab; label: string; hint: string; icon: IconName }[] = [
+  { id: 'style', label: 'Стиль', hint: 'Выбрать узор и покрутить его параметры', icon: 'grid' },
+  { id: 'draw', label: 'Рисовать', hint: 'Кисть, текст, своё фото', icon: 'brush' },
+  { id: 'board', label: 'Доска', hint: 'Размер сетки, породы, толщина', icon: 'board' },
+  { id: 'plan', label: 'Производство', hint: 'Щиты, материал, отходы', icon: 'factory' },
+  { id: 'saved', label: 'Избранное', hint: 'Отложенные варианты', icon: 'star' },
 ];
+
+const FAMILY_ICONS: Record<GeneratorFamily, IconName> = {
+  joinery: 'saw',
+  geometry: 'ruler',
+  radial: 'sun',
+  generative: 'grid',
+};
 
 /** Породы от светлой к тёмной — в этом порядке их ждут генераторы. */
 function byLightness(a: WoodSpecies, b: WoodSpecies): number {
@@ -463,6 +473,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
             title={item.hint}
             onClick={() => setTab(item.id)}
           >
+            <Icon name={item.icon} size={14} />
             {item.label}
             {item.id === 'saved' && favorites.length > 0 && (
               <span className="badge">{favorites.length}</span>
@@ -483,7 +494,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               )}
               {FAMILY_ORDER.map((family) => (
                 <section key={family}>
-                  <h2>{FAMILY_NAMES[family]}</h2>
+                  <h2><Icon name={FAMILY_ICONS[family]} />{FAMILY_NAMES[family]}</h2>
                   <div className="presets">
                     {GENERATORS.filter((item) => item.family === family).map((item) => (
                       <button
@@ -500,7 +511,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               ))}
 
               <section>
-                <h2>Настройка стиля</h2>
+                <h2><Icon name="wrench" size={13} />Настройка стиля</h2>
                 <p className="note-small style-tagline">
                   {customLoaded
                     ? 'Ручки ниже применяются к последнему выбранному стилю, не к текущей картинке.'
@@ -551,7 +562,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           {tab === 'draw' && (
             <>
               <section>
-                <h2>Кисть</h2>
+                <h2><Icon name="brush" />Кисть</h2>
                 <div className="palette">
                   {palette.map((id) => (
                     <button
@@ -577,7 +588,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               </section>
 
               <section>
-                <h2>Свой текст</h2>
+                <h2><Icon name="type" />Свой текст</h2>
                 <textarea
                   value={text}
                   rows={2}
@@ -592,7 +603,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               </section>
 
               <section>
-                <h2>Своё фото</h2>
+                <h2><Icon name="camera" />Своё фото</h2>
                 <label className="wide file-input">
                   <input type="file" accept="image/*" onChange={onPhotoSelected} />
                   {photoName ? `📷 ${photoName}` : '📷 Выбрать фото'}
@@ -620,7 +631,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           {tab === 'board' && (
             <>
               <section>
-                <h2>Породы в работе</h2>
+                <h2><Icon name="swatch" />Породы в работе</h2>
                 <div className="palette">
                   {SPECIES_CATALOG.map((species) => {
                     const inPalette = params.paletteIds.includes(species.id);
@@ -656,7 +667,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               </section>
 
               <section>
-                <h2>Сетка</h2>
+                <h2><Icon name="grid" />Сетка</h2>
                 <label>
                   Клеток по ширине
                   <input
@@ -686,7 +697,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               </section>
 
               <section>
-                <h2>Распил</h2>
+                <h2><Icon name="saw" />Распил</h2>
                 <label>
                   Толщина доски, мм
                   <input
@@ -707,8 +718,8 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
           {tab === 'plan' && (
             <>
-              <section>
-                <h2>Как это собирать</h2>
+              <section className="dom-production">
+                <h2><Icon name="factory" />Как это собирать</h2>
                 <dl>
                   <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
                   <div><dt>Брусков заготовить</dt><dd>{plan.totals.stripsToPrepare}</dd></div>
@@ -717,8 +728,8 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
                 </dl>
               </section>
 
-              <section>
-                <h2>Щиты</h2>
+              <section className="dom-production">
+                <h2><Icon name="layers" />Щиты</h2>
                 <div className="panels-list">
                   {plan.panels.map((panel) => (
                     <div
@@ -754,9 +765,9 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
           {tab === 'saved' && (
             <section>
-              <h2>Избранное</h2>
+              <h2><Icon name="star" />Избранное</h2>
               <button className="wide primary" onClick={onSaveFavorite}>
-                ★ Отложить текущий рисунок
+                <Icon name="star" size={13} />Отложить текущий рисунок
               </button>
               <p className="note-small">
                 {favorites.length} из {FAVORITES_LIMIT}. Отложенное переживает перезагрузку;
@@ -843,7 +854,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
         <aside className="panel report">
           <section>
-            <h2>Готовая доска</h2>
+            <h2><Icon name="board" />Готовая доска</h2>
             <div className="big">
               {formatLength(dims.topLengthMm, 'mm')} × {formatLength(dims.topWidthMm, 'mm')} × {formatLength(dims.thicknessMm, 'mm')}
             </div>
@@ -854,6 +865,8 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
             </dl>
           </section>
+
+          <WorkshopPanel />
 
           <EconomicsPanel
             input={{
@@ -868,8 +881,8 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
           <MoisturePanel usage={moistureUsage} species={speciesMap} />
 
-          <section>
-            <h2>Способ сборки</h2>
+          <section className="dom-production">
+            <h2><Icon name="rotate" />Способ сборки</h2>
             {analysis.block ? (
               <p className="advice">
                 Рисунок повторяется блоком <b>{analysis.block.blockCols}×{analysis.block.blockRows}</b>{' '}
@@ -891,7 +904,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           </section>
 
           <section>
-            <h2>Столярный чек</h2>
+            <h2><Icon name="shield" />Столярный чек</h2>
             <ul className="warnings">
               {!plan.valid && plan.issues.map((issue) => <li key={issue}>{issue}</li>)}
               {plan.totals.glueUps > 8 && !analysis.block && (
@@ -911,12 +924,12 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
           <section>
             <div className="row-actions">
-              <button className="primary" onClick={onShare}>Скопировать ДНК</button>
-              <button onClick={onSaveFavorite}>★ Отложить</button>
+              <button className="primary" onClick={onShare}><Icon name="link" size={14} />Скопировать ДНК</button>
+              <button onClick={onSaveFavorite}><Icon name="star" size={14} />Отложить</button>
             </div>
             <div className="row-actions">
-              <button onClick={onPrint}>Инструкция</button>
-              <button onClick={onExportPng}>Отпечаток</button>
+              <button onClick={onPrint}><Icon name="print" size={14} />Инструкция</button>
+              <button onClick={onExportPng}><Icon name="download" size={14} />Отпечаток</button>
             </div>
           </section>
         </aside>

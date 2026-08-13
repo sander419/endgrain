@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TOOLS, TOOLS, assessWorkshop } from './core';
 import type { ToolId } from './core';
+import { Icon } from './Icon';
 
 const STORAGE_KEY = 'endgrain.workshop.v1';
 
@@ -44,8 +45,8 @@ export function WorkshopPanel() {
   const slower = Math.round((readiness.timeMultiplier - 1) * 100);
 
   return (
-    <section className="workshop">
-      <h2>Моя мастерская</h2>
+    <section className="workshop dom-tools">
+      <h2><Icon name="wrench" />Моя мастерская</h2>
 
       <div className="palette">
         {TOOLS.map((tool) => {

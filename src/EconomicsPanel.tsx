@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { calculateEconomics, formatDuration, loadWorkshopRates, saveWorkshopRates } from './core';
 import type { ProductionInput, WorkshopRates } from './core';
+import { Icon } from './Icon';
 
 interface Props {
   input: ProductionInput;
@@ -27,8 +28,8 @@ export function EconomicsPanel({ input }: Props) {
   const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
   return (
-    <section className="economics">
-      <h2>Стоит ли браться</h2>
+    <section className="economics dom-money">
+      <h2><Icon name="coin" />Стоит ли браться</h2>
 
       <dl>
         <div><dt>Работы</dt><dd>{formatDuration(economics.time.totalMin)}</dd></div>
