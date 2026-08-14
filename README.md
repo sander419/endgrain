@@ -4,6 +4,9 @@
 Исходники: [github.com/sander419/endgrain](https://github.com/sander419/endgrain)
 
 Работает без установки и без сервера: открыл ссылку — можно проектировать.
+**Инструкция для пользователей: [GUIDE.md](GUIDE.md)** — как спроектировать доску и что
+делать с расчётом в мастерской.
+
 Быстрые ссылки для знакомства:
 [мозаика-мандала](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala) ·
 [пейзаж](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=landscape) ·
