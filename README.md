@@ -13,7 +13,7 @@
 
 ## Демо за 10 секунд
 
-![Демонстрация: рисунок → щиты → карта раскроя → инструкция](public/examples/demo.gif)
+![Демонстрация: рисунок → щиты → карта раскроя → инструкция](examples/demo.gif)
 
 Рисунок → компиляция в щиты → карта раскроя → печатная инструкция. Доска в 3D крутится сама,
 пока её не потянули мышью.
@@ -25,15 +25,15 @@
 
 | | |
 |---|---|
-| [<img src="public/examples/mandala.png" width="380" alt="Мандала">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala&view=3d)<br>**Мандала** · 21×21 клетка, 4 породы · 11 щитов, 231 брусок | [<img src="public/examples/text-hiborg.png" width="380" alt="Надпись ХИБОРГ">](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93&view=3d)<br>**Надпись** · сетка сама расширяется под длину слова |
-| [<img src="public/examples/maze.png" width="380" alt="Лабиринт">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=maze&view=3d)<br>**Лабиринт** · настоящий проходимый, генерируется обходом | [<img src="public/examples/landscape.png" width="380" alt="Пейзаж">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=landscape&view=3d)<br>**Пейзаж** · 4 породы, горизонт и отражение |
-| [<img src="public/examples/recipe-checker.png" width="380" alt="Шахматка в режиме Рецепт">](https://hiborg-space.ru/endgrain/?mode=recipe&stage=pattern&view=3d)<br>**Шахматка** · режим «Рецепт», 560×240×40, отходы 21.1% | |
+| [<img src="examples/mandala.png" width="380" alt="Мандала">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala&view=3d)<br>**Мандала** · 21×21 клетка, 4 породы · 11 щитов, 231 брусок | [<img src="examples/text-hiborg.png" width="380" alt="Надпись ХИБОРГ">](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93&view=3d)<br>**Надпись** · сетка сама расширяется под длину слова |
+| [<img src="examples/maze.png" width="380" alt="Лабиринт">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=maze&view=3d)<br>**Лабиринт** · настоящий проходимый, генерируется обходом | [<img src="examples/landscape.png" width="380" alt="Пейзаж">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=landscape&view=3d)<br>**Пейзаж** · 4 породы, горизонт и отражение |
+| [<img src="examples/recipe-checker.png" width="380" alt="Шахматка в режиме Рецепт">](https://hiborg-space.ru/endgrain/?mode=recipe&stage=pattern&view=3d)<br>**Шахматка** · режим «Рецепт», 560×240×40, отходы 21.1% | |
 
 Каждая ссылка ниже — не картинка, а полный проект: Board DNA целиком в URL, без сервера и базы.
 
 | | |
 |---|---|
-| [Зеркальный каньон](https://hiborg-space.ru/endgrain/?mode=recipe#dna=eyJ2IjoxLCJzZWVkIjoxLCJyZWNpcGUiOnsidW5pdHMiOiJtbSIsInNwZWNpZXMiOnsibWFwbGUiOnsiaWQiOiJtYXBsZSIsIm5hbWUiOiLQmtC70ZHQvSIsImNvbG9ySGV4IjoiI0U4QzlBMCIsImRlbnNpdHlLZ00zIjo3MDUsInByaWNlUGVyQ3ViaWNNZXRlciI6OTUwMDB9LCJ3YWxudXQiOnsiaWQiOiJ3YWxudXQiLCJuYW1lIjoi0J7RgNC10YUiLCJjb2xvckhleCI6IiM1QjQwMzQiLCJkZW5zaXR5S2dNMyI6NjEwLCJwcmljZVBlckN1YmljTWV0ZXIiOjE5MDAwMH19LCJwYW5lbCI6eyJzdHJpcHMiOlt7InNwZWNpZXNJZCI6Im1hcGxlIiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoid2FsbnV0Iiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoibWFwbGUiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJ3YWxudXQiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJtYXBsZSIsIndpZHRoTW0iOjQwfSx7InNwZWNpZXNJZCI6IndhbG51dCIsIndpZHRoTW0iOjQwfV0sInN0cmlwVGhpY2tuZXNzTW0iOjQwLCJ1c2FibGVMZW5ndGhNbSI6NjAwfSwiY3Jvc3NjdXQiOnsic2xpY2VUaGlja25lc3NNbSI6NDAsInNhd0tlcmZNbSI6MywiYmxhZGVBbmdsZURlZyI6OTB9LCJ0cmFuc2Zvcm0iOnsiZmxpcE9kZFNsaWNlcyI6ZmFsc2UsImN5Y2xpY1NoaWZ0U3RlcCI6MCwibWFudWFsU2xpY2VzIjpbWzAsMSwyLDMsNCw1XSxbMSwyLDMsNCw1LDBdLFsyLDMsNCw1LDAsMV0sWzMsNCw1LDAsMSwyXSxbNCw1LDAsMSwyLDNdLFs1LDAsMSwyLDMsNF0sWzAsMSwyLDMsNCw1XSxbMCwxLDIsMyw0LDVdLFs1LDAsMSwyLDMsNF0sWzQsNSwwLDEsMiwzXSxbMyw0LDUsMCwxLDJdLFsyLDMsNCw1LDAsMV0sWzEsMiwzLDQsNSwwXSxbMCwxLDIsMyw0LDVdXX0sImFsbG93YW5jZXMiOnsidGhpY2tuZXNzU3VyZmFjaW5nTW0iOjMsInN0cmlwV2lkdGhKb2ludE1tIjoyLCJwYW5lbEVuZFRyaW1NbSI6MzB9fX0) — режим «Рецепт», клён/орех, ручная раскладка планок. 560×240×40, отходы 21.1% |
+| [Ручная раскладка планок](https://hiborg-space.ru/endgrain/?mode=recipe#dna=eyJ2IjoxLCJzZWVkIjoxLCJyZWNpcGUiOnsidW5pdHMiOiJtbSIsInNwZWNpZXMiOnsibWFwbGUiOnsiaWQiOiJtYXBsZSIsIm5hbWUiOiLQmtC70ZHQvSIsImNvbG9ySGV4IjoiI0U4QzlBMCIsImRlbnNpdHlLZ00zIjo3MDUsInByaWNlUGVyQ3ViaWNNZXRlciI6OTUwMDB9LCJ3YWxudXQiOnsiaWQiOiJ3YWxudXQiLCJuYW1lIjoi0J7RgNC10YUiLCJjb2xvckhleCI6IiM1QjQwMzQiLCJkZW5zaXR5S2dNMyI6NjEwLCJwcmljZVBlckN1YmljTWV0ZXIiOjE5MDAwMH19LCJwYW5lbCI6eyJzdHJpcHMiOlt7InNwZWNpZXNJZCI6Im1hcGxlIiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoid2FsbnV0Iiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoibWFwbGUiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJ3YWxudXQiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJtYXBsZSIsIndpZHRoTW0iOjQwfSx7InNwZWNpZXNJZCI6IndhbG51dCIsIndpZHRoTW0iOjQwfV0sInN0cmlwVGhpY2tuZXNzTW0iOjQwLCJ1c2FibGVMZW5ndGhNbSI6NjAwfSwiY3Jvc3NjdXQiOnsic2xpY2VUaGlja25lc3NNbSI6NDAsInNhd0tlcmZNbSI6MywiYmxhZGVBbmdsZURlZyI6OTB9LCJ0cmFuc2Zvcm0iOnsiZmxpcE9kZFNsaWNlcyI6ZmFsc2UsImN5Y2xpY1NoaWZ0U3RlcCI6MCwibWFudWFsU2xpY2VzIjpbWzAsMSwyLDMsNCw1XSxbMSwyLDMsNCw1LDBdLFsyLDMsNCw1LDAsMV0sWzMsNCw1LDAsMSwyXSxbNCw1LDAsMSwyLDNdLFs1LDAsMSwyLDMsNF0sWzAsMSwyLDMsNCw1XSxbMCwxLDIsMyw0LDVdLFs1LDAsMSwyLDMsNF0sWzQsNSwwLDEsMiwzXSxbMyw0LDUsMCwxLDJdLFsyLDMsNCw1LDAsMV0sWzEsMiwzLDQsNSwwXSxbMCwxLDIsMyw0LDVdXX0sImFsbG93YW5jZXMiOnsidGhpY2tuZXNzU3VyZmFjaW5nTW0iOjMsInN0cmlwV2lkdGhKb2ludE1tIjoyLCJwYW5lbEVuZFRyaW1NbSI6MzB9fX0) — режим «Рецепт», клён/орех, ручная раскладка планок. 560×240×40, отходы 21.1% |
 | [Мандала «Рельеф»](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala) — режим «Мозаика», 4 породы, 21×21 клетка. 11 щитов, 231 брусок |
 | [Надпись «ХИБОРГ»](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93) — текст в клетках, клён/венге. 8 щитов, 168 брусков |
 
@@ -77,7 +77,7 @@ npm run dev
 ```
 
 Прод-сборка — `npm run build` (статика в `dist/`, бэкенда нет).
-Тесты — `npm test` (Vitest, 149 тестов).
+Тесты — `npm test` (Vitest, 155 тестов).
 
 ## Что умеет
 
