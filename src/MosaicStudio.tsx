@@ -30,6 +30,8 @@ import type {
   WoodSpecies,
 } from './core';
 import { hitTestCell, renderMosaic } from './render/mosaicBoard';
+import { gridFromMosaic, gridKey, renderBoard3d } from './render/board3d';
+import { useBoardCamera } from './useBoardCamera';
 import { textToMosaic } from './render/textMosaic';
 import { imageToMosaic } from './render/imageMosaic';
 import { MosaicPrintSheet } from './MosaicPrintSheet';
@@ -392,6 +394,21 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
   /** Щиты подсвечиваются только на вкладке производства — там это по делу. */
   const showPanels = tab === 'plan';
 
+  // На вкладке рисования объём выключен: кисть работает по плоской сетке.
+  const camera3d = useBoardCamera(tab !== 'draw');
+  const show3d = camera3d.threeD && tab !== 'draw';
+  const grid3d = useMemo(
+    () =>
+      gridFromMosaic(
+        mosaic.cells,
+        mosaic.cellMm,
+        (speciesId) => speciesMap[speciesId]?.colorHex ?? '#888888',
+        oil
+      ),
+    [mosaic, speciesMap, oil]
+  );
+  const grid3dKey = useMemo(() => gridKey(grid3d), [grid3d]);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const parent = canvas?.parentElement;
@@ -405,8 +422,21 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    if (show3d) {
+      renderBoard3d(ctx, {
+        grid: grid3d,
+        thicknessMm: plan.finalDimensions.thicknessMm,
+        yaw: camera3d.camera.yaw,
+        pitch: camera3d.camera.pitch,
+        textureKey: `mosaic:${grid3dKey}`,
+      });
+      return;
+    }
     renderMosaic(ctx, mosaic, { species: speciesMap, oil, showPanels, plan, hover, highlightPanel });
-  }, [mosaic, speciesMap, oil, showPanels, plan, hover, highlightPanel]);
+  }, [
+    mosaic, speciesMap, oil, showPanels, plan, hover, highlightPanel,
+    show3d, grid3d, grid3dKey, camera3d.camera,
+  ]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -827,17 +857,47 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
           ) : (
             <>
               <div className="canvas-wrap">
-                <canvas
-                  ref={canvasRef}
-                  className={tab === 'draw' ? 'pickable' : ''}
-                  onMouseDown={(event) => { setPainting(true); paintAt(event); }}
-                  onMouseUp={() => setPainting(false)}
-                  onMouseLeave={() => { setPainting(false); setHover(null); }}
-                  onMouseMove={(event) => {
-                    if (tab === 'draw') setHover(cellAt(event));
-                    if (painting) paintAt(event);
-                  }}
-                />
+                {show3d ? (
+                  <canvas ref={canvasRef} className="grabbable" {...camera3d.handlers} />
+                ) : (
+                  <canvas
+                    ref={canvasRef}
+                    className={tab === 'draw' ? 'pickable' : ''}
+                    onMouseDown={(event) => { setPainting(true); paintAt(event); }}
+                    onMouseUp={() => setPainting(false)}
+                    onMouseLeave={() => { setPainting(false); setHover(null); }}
+                    onMouseMove={(event) => {
+                      if (tab === 'draw') setHover(cellAt(event));
+                      if (painting) paintAt(event);
+                    }}
+                  />
+                )}
+                {tab !== 'draw' && (
+                  <div className="view-toggle">
+                    <button
+                      className={camera3d.threeD ? '' : 'on'}
+                      onClick={() => camera3d.setThreeD(false)}
+                    >
+                      <Icon name="grid" size={13} />План
+                    </button>
+                    <button
+                      className={camera3d.threeD ? 'on' : ''}
+                      onClick={() => camera3d.setThreeD(true)}
+                    >
+                      <Icon name="board" size={13} />3D
+                    </button>
+                    {show3d && (
+                      <button className="ghost" onClick={camera3d.reset} title="Вернуть камеру">↺</button>
+                    )}
+                  </div>
+                )}
+                {show3d && (
+                  <p className="view-hint">
+                    {camera3d.spin
+                      ? 'Тяни мышью, чтобы повернуть доску'
+                      : `Толщина ${Math.round(plan.finalDimensions.thicknessMm)} мм — толщина среза`}
+                  </p>
+                )}
               </div>
 
               {/* На этапах чтения цифры выносим прямо под превью: там они и нужны. */}

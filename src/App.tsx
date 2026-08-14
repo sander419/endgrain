@@ -31,6 +31,8 @@ import {
   swapSlices,
 } from './core';
 import { hitTestSlice, renderScene } from './render/board';
+import { gridFromRecipe, gridKey, renderBoard3d } from './render/board3d';
+import { useBoardCamera } from './useBoardCamera';
 import { PrintSheet } from './PrintSheet';
 import { useHistoryState } from './useHistoryState';
 import { MosaicStudio } from './MosaicStudio';
@@ -163,7 +165,15 @@ export default function App() {
   }, [mode]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Объём показываем только на готовой доске: на этапах щита и распила
+  // крутить нечего, там смотрят на плоскую схему.
+  const camera3d = useBoardCamera(mode === 'recipe' && step === 'final');
+  const show3d = camera3d.threeD && step === 'final';
+
   const projection = useMemo(() => projectRecipe(recipe), [recipe]);
+  const grid3d = useMemo(() => gridFromRecipe(recipe, projection, oil), [recipe, projection, oil]);
+  // Ключ считается один раз на изменение рисунка, а не в каждом кадре вращения.
+  const grid3dKey = useMemo(() => gridKey(grid3d), [grid3d]);
   const warnings = useMemo(() => checkJoinery(recipe), [recipe]);
   const manualCount = manualSliceCount(recipe);
 
@@ -238,8 +248,21 @@ export default function App() {
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    if (show3d) {
+      renderBoard3d(ctx, {
+        grid: grid3d,
+        thicknessMm: projection.finalDimensions.thicknessMm,
+        yaw: camera3d.camera.yaw,
+        pitch: camera3d.camera.pitch,
+        textureKey: `recipe:${grid3dKey}`,
+      });
+      return;
+    }
     renderScene(ctx, recipe, projection, { step, oil, explode, selectedSlice });
-  }, [recipe, projection, step, oil, explode, selectedSlice]);
+  }, [
+    recipe, projection, step, oil, explode, selectedSlice,
+    show3d, grid3d, grid3dKey, camera3d.camera,
+  ]);
 
   useEffect(() => {
     draw();
@@ -670,12 +693,39 @@ export default function App() {
           <div className="canvas-wrap">
             <canvas
               ref={canvasRef}
-              onClick={onCanvasClick}
-              className={step === 'final' || step === 'flip' ? 'pickable' : ''}
+              onClick={show3d ? undefined : onCanvasClick}
+              className={
+                show3d ? 'grabbable' : step === 'final' || step === 'flip' ? 'pickable' : ''
+              }
+              {...(show3d ? camera3d.handlers : {})}
             />
+            {step === 'final' && (
+              <div className="view-toggle">
+                <button
+                  className={camera3d.threeD ? '' : 'on'}
+                  onClick={() => camera3d.setThreeD(false)}
+                >
+                  <Icon name="grid" size={13} />План
+                </button>
+                <button
+                  className={camera3d.threeD ? 'on' : ''}
+                  onClick={() => camera3d.setThreeD(true)}
+                >
+                  <Icon name="board" size={13} />3D
+                </button>
+                {show3d && (
+                  <button className="ghost" onClick={camera3d.reset} title="Вернуть камеру">↺</button>
+                )}
+              </div>
+            )}
+            {show3d && (
+              <p className="view-hint">
+                {camera3d.spin ? 'Тяни мышью, чтобы повернуть доску' : 'Толщина доски — срез щита'}
+              </p>
+            )}
           </div>
 
-          {(step === 'final' || step === 'flip') && (
+          {!show3d && (step === 'final' || step === 'flip') && (
             <div className={selectedSlice === null ? 'slice-bar empty' : 'slice-bar'}>
               {selectedSlice === null ? (
                 <span className="slice-help">
