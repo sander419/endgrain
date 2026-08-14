@@ -1,4 +1,5 @@
 import type { Recipe } from './types';
+import { sanitizeRecipe } from './sanitize';
 
 export interface BoardDna {
   v: 1;
@@ -61,7 +62,9 @@ export function decodeBoardDna(code: string): BoardDna | null {
     if (!parsed || typeof parsed !== 'object') return null;
     if (parsed.v !== 1) return null;
     if (!parsed.recipe || typeof parsed.recipe !== 'object') return null;
-    return parsed as BoardDna;
+    // Ссылку присылают в чате: числа и цвета из неё зажимаем до того, как они
+    // попадут в расчёт и в разметку. Подробности — в core/sanitize.ts.
+    return { ...parsed, recipe: sanitizeRecipe(parsed.recipe as Recipe) } as BoardDna;
   } catch { return null; }
 }
 

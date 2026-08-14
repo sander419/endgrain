@@ -34,6 +34,7 @@ import {
 import { hitTestSlice, renderScene } from './render/board';
 import { gridFromRecipe, gridKey, renderBoard3d } from './render/board3d';
 import { useBoardCamera } from './useBoardCamera';
+import { sanitizeRecipe } from './core/sanitize';
 import { NestingPanel } from './NestingPanel';
 import type { NestPiece } from './core/nesting';
 import { PrintSheet } from './PrintSheet';
@@ -67,8 +68,10 @@ function loadInitialRecipe(): { recipe: Recipe; seed: number } {
   const fromUrl = readDnaFromLocation();
   if (fromUrl) return { recipe: withCatalog(fromUrl.recipe), seed: fromUrl.seed ?? 1 };
   try {
+    // Санитайзер нужен и здесь: в localStorage лежит то, что в прошлый визит
+    // могло приехать из чужой ссылки и пережить перезагрузку.
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return { recipe: withCatalog(JSON.parse(saved) as Recipe), seed: 1 };
+    if (saved) return { recipe: withCatalog(sanitizeRecipe(JSON.parse(saved) as Recipe)), seed: 1 };
   } catch {
     /* битый localStorage — просто берём дефолт */
   }

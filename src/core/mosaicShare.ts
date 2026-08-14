@@ -7,6 +7,7 @@
 import type { Mosaic } from './mosaic';
 import { mosaicSize } from './mosaic';
 import { toBase64Url, fromBase64Url } from './share';
+import { sanitizeMosaicSize, sanitizeText } from './sanitize';
 
 export interface MosaicDna {
   v: 1;
@@ -41,16 +42,23 @@ export function encodeMosaicDna(mosaic: Mosaic): MosaicDna {
 }
 
 export function decodeMosaicDna(dna: MosaicDna): Mosaic | null {
-  const { rows, cols, cellMm, palette, grid } = dna;
+  const { palette, grid } = dna;
+  // Размеры из чужой ссылки зажимаем: сетка 100000×100000 вешает вкладку
+  // ещё до того, как компилятор щитов успеет что-то сказать.
+  const { rows, cols, cellMm } = sanitizeMosaicSize(dna.rows, dna.cols, dna.cellMm);
   if (!(rows > 0) || !(cols > 0) || !Array.isArray(palette) || palette.length === 0) return null;
   if (typeof grid !== 'string' || grid.length !== rows * cols) return null;
+
+  // Клетка хранит id породы, а не цвет: неизвестный id просто не найдётся
+  // в каталоге. Длину всё же ограничиваем — она уходит в ключи и в подписи.
+  const safePalette = palette.map((id) => sanitizeText(id, 40) || 'maple');
 
   const cells: string[][] = [];
   for (let r = 0; r < rows; r++) {
     const row: string[] = [];
     for (let c = 0; c < cols; c++) {
       const index = parseInt(grid[r * cols + c], 36);
-      row.push(palette[index] ?? palette[0]);
+      row.push(safePalette[index] ?? safePalette[0]);
     }
     cells.push(row);
   }
