@@ -4,8 +4,21 @@
     {
       "name": "endgrain",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "endgrain-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview"
+      ],
+      "port": 4173,
       "autoPort": true
     }
   ]
