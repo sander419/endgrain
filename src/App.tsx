@@ -38,6 +38,7 @@ import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
 import { WorkshopPanel } from './WorkshopPanel';
 import { Icon } from './Icon';
+import type { IconName } from './Icon';
 import './App.css';
 
 const STORAGE_KEY = 'endgrain.recipe.v1';
@@ -69,12 +70,67 @@ function loadInitialRecipe(): { recipe: Recipe; seed: number } {
   return { recipe: defaultRecipe(), seed: 1 };
 }
 
-/** `#step=crosscut` открывает нужный этап сразу — для демо-ссылок и снимков. */
+/**
+ * Какой вид доски показать на старте. `#step=crosscut` задаёт его напрямую,
+ * иначе вид берётся у этапа из `?stage=` — иначе ссылка на «Распил» открывала бы
+ * инструменты распила рядом с картинкой готовой доски.
+ */
 function initialStep(): ProcessStep {
   const match = window.location.hash.match(/step=(\w+)/);
   const found = PROCESS_STEPS.find((s) => s.id === match?.[1]);
-  return found?.id ?? 'final';
+  if (found) return found.id;
+
+  const stageId = new URLSearchParams(window.location.search).get('stage');
+  const stage = RECIPE_STAGES.find((item) => item.id === stageId);
+  return stage?.view ?? 'final';
 }
+
+/**
+ * Этапы работы в режиме «Рецепт». Та же логика, что и в мозаике: инструменты
+ * показываются только для текущего этапа, а раскладка меняется — на этапах
+ * создания холст большой, на этапах отчёта уезжает в угол превьюшкой.
+ *
+ * Не путать с `ProcessStep` (Бруски → Щит A → Распил → …): тот переключает ВИД
+ * доски внутри этапа, этот — набор инструментов. Связаны через `view`:
+ * выбирая этап, человек сразу видит ту стадию сборки, о которой идёт речь.
+ */
+type RecipeStage = 'set' | 'cut' | 'pattern' | 'plan' | 'money';
+
+interface RecipeStageMeta {
+  id: RecipeStage;
+  label: string;
+  icon: IconName;
+  kind: 'create' | 'analyze';
+  view?: ProcessStep;
+  tip: string;
+}
+
+const RECIPE_STAGES: RecipeStageMeta[] = [
+  {
+    id: 'set', label: 'Набор', icon: 'board', kind: 'create', view: 'panelA',
+    tip: 'Собери щит A: какие породы и какой ширины бруски в него идут. Порядок можно менять стрелками, дублировать и зеркалить.',
+  },
+  {
+    id: 'cut', label: 'Распил', icon: 'saw', kind: 'create', view: 'crosscut',
+    tip: 'Толщина брусков, длина щита, толщина готовой доски и ширина пропила. Отсюда считается, сколько планок выйдет из щита.',
+  },
+  {
+    id: 'pattern', label: 'Узор', icon: 'grid', kind: 'create', view: 'final',
+    tip: 'Пресет задаёт узор целиком, а клик по планке правит её отдельно: перевернуть, сдвинуть, поменять местами. Ctrl+Z отменяет.',
+  },
+  {
+    id: 'plan', label: 'Производство', icon: 'factory', kind: 'analyze', view: 'final',
+    tip: 'Что и в каком объёме нужно купить, сколько уйдёт в отход и что проверить перед склейкой.',
+  },
+  {
+    id: 'money', label: 'Экономика', icon: 'coin', kind: 'analyze', view: 'final',
+    tip: 'Сколько времени уйдёт, во что обойдётся и за сколько продавать. Плюс движение древесины по влажности.',
+  },
+];
+
+const RECIPE_STAGE_BY_ID: Record<RecipeStage, RecipeStageMeta> = Object.fromEntries(
+  RECIPE_STAGES.map((item) => [item.id, item])
+) as Record<RecipeStage, RecipeStageMeta>;
 
 export default function App() {
   const initial = useMemo(loadInitialRecipe, []);
@@ -86,6 +142,13 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
+  const [stage, setStage] = useState<RecipeStage>(() => {
+    // ?stage=plan — прямая ссылка на этап, как в мозаике.
+    const fromQuery = new URLSearchParams(window.location.search).get('stage');
+    return RECIPE_STAGES.some((item) => item.id === fromQuery)
+      ? (fromQuery as RecipeStage)
+      : 'pattern';
+  });
   const [mode, setMode] = useState<'recipe' | 'mosaic'>(() => {
     // ?mode=recipe — прямая ссылка на классический конструктор.
     const fromQuery = new URLSearchParams(window.location.search).get('mode');
@@ -419,9 +482,36 @@ export default function App() {
 
       {mode === 'mosaic' && <MosaicStudio oil={oil} onOilChange={setOil} />}
 
-      <main className="layout" hidden={mode !== 'recipe'}>
-        <aside className="panel editor">
-          <section>
+      <div className="studio-tabs" hidden={mode !== 'recipe'}>
+        {RECIPE_STAGES.map((item, index) => (
+          <button
+            key={item.id}
+            className={stage === item.id ? 'on' : ''}
+            title={item.tip}
+            onClick={() => {
+              setStage(item.id);
+              // Вид доски следует за этапом: выбрал «Распил» — видишь распил.
+              if (item.view) setStep(item.view);
+            }}
+          >
+            <span className="step-num">{index + 1}</span>
+            <Icon name={item.icon} size={14} />
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <main
+        className={`layout stage-${RECIPE_STAGE_BY_ID[stage].kind}`}
+        hidden={mode !== 'recipe'}
+      >
+        <aside className="panel editor" hidden={RECIPE_STAGE_BY_ID[stage].kind !== 'create'}>
+          <p className="stage-tip">
+            <Icon name={RECIPE_STAGE_BY_ID[stage].icon} size={14} />
+            {RECIPE_STAGE_BY_ID[stage].tip}
+          </p>
+
+          <section hidden={stage !== 'set'}>
             <h2><Icon name="board" />Бруски щита A</h2>
             <div className="strips">
               {recipe.panel.strips.map((strip, index) => (
@@ -481,7 +571,7 @@ export default function App() {
             </div>
           </section>
 
-          <section>
+          <section hidden={stage !== 'cut'}>
             <h2><Icon name="ruler" />Размеры</h2>
             <label>
               Толщина брусков
@@ -517,7 +607,7 @@ export default function App() {
             </label>
           </section>
 
-          <section>
+          <section hidden={stage !== 'pattern'}>
             <h2><Icon name="rotate" />Трансформация</h2>
             <label className="checkbox">
               <input
@@ -537,7 +627,7 @@ export default function App() {
             </label>
           </section>
 
-          <section>
+          <section hidden={stage !== 'pattern'}>
             <h2><Icon name="grid" />Пресеты</h2>
             <div className="presets">
               {PRESETS.map((preset) => (
@@ -549,8 +639,8 @@ export default function App() {
             <button className="wide wild" onClick={onWild}>🎲 Сгенерировать дикую доску</button>
           </section>
 
-          <section>
-            <h2>Единицы</h2>
+          <section hidden={stage !== 'set'}>
+            <h2><Icon name="ruler" />Единицы</h2>
             <div className="segmented">
               <button
                 className={units === 'mm' ? 'on' : ''}
@@ -631,6 +721,13 @@ export default function App() {
         </section>
 
         <aside className="panel report">
+          {RECIPE_STAGE_BY_ID[stage].kind === 'analyze' && (
+            <p className="stage-tip">
+              <Icon name={RECIPE_STAGE_BY_ID[stage].icon} size={14} />
+              {RECIPE_STAGE_BY_ID[stage].tip}
+            </p>
+          )}
+
           <section>
             <h2><Icon name="board" />Готовая доска</h2>
             <div className="big">
@@ -644,7 +741,7 @@ export default function App() {
             </dl>
           </section>
 
-          <section className="dom-material">
+          <section className="dom-material" hidden={stage !== 'plan'}>
             <h2><Icon name="layers" />Материал и отходы</h2>
             <dl>
               <div><dt>Сырой объём</dt><dd>{projection.totals.rawVolumeM3.toFixed(5)} м³</dd></div>
@@ -657,7 +754,7 @@ export default function App() {
             </dl>
           </section>
 
-          <section className="dom-material">
+          <section className="dom-material" hidden={stage !== 'plan'}>
             <h2><Icon name="swatch" />По породам</h2>
             <table className="materials">
               <tbody>
@@ -681,22 +778,26 @@ export default function App() {
             </table>
           </section>
 
-          <WorkshopPanel />
+          {stage === 'money' && (
+            <>
+              <WorkshopPanel />
 
-          <EconomicsPanel
-            input={{
-              strips: recipe.panel.strips.length,
-              glueUps: 1,
-              crosscuts: cuts,
-              lengthMm: dims.topLengthMm,
-              widthMm: dims.topWidthMm,
-              materialCostRub: projection.totals.totalCost,
-            }}
-          />
+              <EconomicsPanel
+                input={{
+                  strips: recipe.panel.strips.length,
+                  glueUps: 1,
+                  crosscuts: cuts,
+                  lengthMm: dims.topLengthMm,
+                  widthMm: dims.topWidthMm,
+                  materialCostRub: projection.totals.totalCost,
+                }}
+              />
 
-          <MoisturePanel usage={moistureUsage} species={recipe.species} />
+              <MoisturePanel usage={moistureUsage} species={recipe.species} />
+            </>
+          )}
 
-          <section>
+          <section hidden={stage === 'money'}>
             <h2><Icon name="shield" />Столярный чек</h2>
             {!projection.valid && (
               <ul className="issues">

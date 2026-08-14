@@ -178,12 +178,12 @@ input[type="number"]:focus-visible, select:focus-visible, button:focus-visible {
   padding: 16px;
   overflow-y: auto;
   max-height: calc(100vh - 64px);
-}
-
-.panel section + section {
-  margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
+  /* Flex с gap вместо `section + section { margin-top }`: секции скрываются
+     по этапам, и соседский селектор оставлял то двойные отступы, то слипшиеся
+     заголовки — скрытый элемент всё равно оставался «предыдущим». */
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .panel h2 {
@@ -511,7 +511,136 @@ button.link:hover { background: none; color: var(--text); }
   font-weight: 700;
 }
 
-.layout.studio .panel { max-height: calc(100vh - 110px); }
+/* Под панелью этапов остаётся меньше высоты, чем под одной шапкой. */
+.layout.studio .panel,
+.layout.stage-create .panel,
+.layout.stage-analyze .panel { max-height: calc(100vh - 110px); }
+.layout.studio .stage,
+.layout.stage-create .stage,
+.layout.stage-analyze .stage { max-height: calc(100vh - 110px); }
+
+/* ── Раскладка по этапу ─────────────────────────────
+   Главное решение экрана: холст большой там, где рисуешь, и маленький там,
+   где читаешь цифры. Держать его во весь экран на этапе отчёта — тратить
+   лучшее место на картинку, которую уже нарисовал.
+   Правила общие для обоих режимов — «Рецепт» и «Мозаика» работают одинаково. */
+
+/* Создание: инструменты | БОЛЬШОЙ ХОЛСТ | короткая сводка */
+.layout.stage-create { grid-template-columns: 320px minmax(0, 1fr) 250px; }
+
+/* Анализ: превью в углу + сводка | ШИРОКИЙ ОТЧЁТ */
+.layout.stage-analyze { grid-template-columns: 340px minmax(0, 1fr); }
+
+.layout.stage-analyze .stage { overflow-y: auto; }
+.layout.stage-analyze .canvas-wrap { flex: none; height: 260px; min-height: 0; }
+
+/* Отчёт не растягиваем на всю ширину: пара «подпись — число» через полтора
+   метра пустоты не читается, глазу нечем связать одно с другим. Вместо этого
+   раскладываем секции в колонки по мере появления места. */
+.layout.stage-analyze .report {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
+  gap: 0 22px;
+  align-content: start;
+  justify-content: start;
+}
+
+.layout.stage-analyze .report > .stage-tip { grid-column: 1 / -1; }
+.layout.stage-analyze .report .actions-block { grid-column: 1 / -1; max-width: 620px; }
+
+
+/* Галерея занимает всё: инструментов у неё нет. */
+.layout.studio.stage-gallery { grid-template-columns: minmax(0, 1fr); }
+
+.stage-summary {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 13px;
+  background: var(--panel);
+}
+
+.stage-summary h2,
+.quick-summary h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.stage-summary .big,
+.quick-summary .big {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 9px;
+}
+
+.stage-summary dl > div,
+.quick-summary dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dotted #2a211a;
+}
+
+.stage-summary dt, .quick-summary dt { color: var(--muted); font-size: 12px; }
+.stage-summary dd, .quick-summary dd { margin: 0; font-variant-numeric: tabular-nums; font-size: 12px; }
+.stage-summary .accent dd, .quick-summary .accent dd { color: var(--accent); font-weight: 600; }
+
+/* Подсказка «что здесь делать» — на каждом этапе своя. */
+.stage-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #1d1712;
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.stage-tip svg { flex: none; margin-top: 1px; color: var(--accent); }
+
+.actions-block { margin-top: auto; }
+
+.studio-tabs .step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.studio-tabs button.on .step-num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #23150a;
+}
+
+.gallery-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gallery-head .stage-tip { flex: 1; min-width: 260px; margin: 0; }
+.gallery-head .note-small { margin: 0; white-space: nowrap; }
 
 .style-tagline { margin-top: 0; margin-bottom: 12px; color: var(--text); }
 

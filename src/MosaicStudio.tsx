@@ -42,16 +42,66 @@ import type { IconName } from './Icon';
 
 const STORAGE_KEY = 'endgrain.mosaic.v1';
 
-/** Вкладки: у каждой свой набор инструментов и свой вид превью. */
-type Tab = 'style' | 'draw' | 'board' | 'plan' | 'saved';
+/** Этапы работы: у каждого свои инструменты, своя раскладка и своя подсказка. */
+type Tab = 'style' | 'draw' | 'board' | 'plan' | 'money' | 'saved';
 
-const TABS: { id: Tab; label: string; hint: string; icon: IconName }[] = [
-  { id: 'style', label: 'Стиль', hint: 'Выбрать узор и покрутить его параметры', icon: 'grid' },
-  { id: 'draw', label: 'Рисовать', hint: 'Кисть, текст, своё фото', icon: 'brush' },
-  { id: 'board', label: 'Доска', hint: 'Размер сетки, породы, толщина', icon: 'board' },
-  { id: 'plan', label: 'Производство', hint: 'Щиты, материал, отходы', icon: 'factory' },
-  { id: 'saved', label: 'Избранное', hint: 'Отложенные варианты', icon: 'star' },
+/**
+ * Раскладка меняется по этапу, и это главное решение всего экрана:
+ * — `create`: рисуешь, поэтому холст занимает центр во всю высоту;
+ * — `analyze`: читаешь отчёт, поэтому холст уезжает в угол превьюшкой,
+ *   а место отдаётся таблицам и цифрам;
+ * — `gallery`: холста нет вовсе.
+ * Держать холст огромным на этапе чтения цифр — тратить главное место экрана
+ * на картинку, которую ты уже нарисовал.
+ */
+type StageKind = 'create' | 'analyze' | 'gallery';
+
+interface TabMeta {
+  id: Tab;
+  label: string;
+  hint: string;
+  icon: IconName;
+  kind: StageKind;
+  /** Подсказка «что здесь делать» — показывается над инструментами этапа. */
+  tip: string;
+}
+
+const TABS: TabMeta[] = [
+  {
+    id: 'style', label: 'Стиль', icon: 'grid', kind: 'create',
+    hint: 'Выбрать узор и покрутить его параметры',
+    tip: 'Выбери узор слева, потом покрути его ручки. «Другой вариант» даёт новую версию того же стиля, а не случайный рисунок.',
+  },
+  {
+    id: 'draw', label: 'Рисовать', icon: 'brush', kind: 'create',
+    hint: 'Кисть, текст, своё фото',
+    tip: 'Возьми породу-кисть и рисуй прямо по доске, зажав мышь. Или набери надпись, или загрузи фото — оно сведётся к твоим породам. Ctrl+Z отменяет.',
+  },
+  {
+    id: 'board', label: 'Доска', icon: 'board', kind: 'create',
+    hint: 'Размер сетки, породы, толщина',
+    tip: 'Здесь физика: сколько клеток, какого размера брусок, какие породы в работе. Смена сетки сохраняет рисунок — перерисовать можно на вкладке «Стиль».',
+  },
+  {
+    id: 'plan', label: 'Производство', icon: 'factory', kind: 'analyze',
+    hint: 'Щиты, порядок сборки, столярный чек',
+    tip: 'Во что рисунок превращается на верстаке. Наведи на щит — его колонки подсветятся на доске.',
+  },
+  {
+    id: 'money', label: 'Экономика', icon: 'coin', kind: 'analyze',
+    hint: 'Время, себестоимость, цена продажи, движение древесины',
+    tip: 'Сколько времени уйдёт, во что обойдётся и за сколько продавать. Ставки мастерской настраиваются и запоминаются.',
+  },
+  {
+    id: 'saved', label: 'Избранное', icon: 'star', kind: 'gallery',
+    hint: 'Отложенные варианты',
+    tip: 'Отложенные рисунки. Можно спокойно экспериментировать дальше — вариант не потеряется.',
+  },
 ];
+
+const TAB_BY_ID: Record<Tab, TabMeta> = Object.fromEntries(
+  TABS.map((item) => [item.id, item])
+) as Record<Tab, TabMeta>;
 
 const FAMILY_ICONS: Record<GeneratorFamily, IconName> = {
   joinery: 'saw',
@@ -114,7 +164,11 @@ interface Props {
 }
 
 export function MosaicStudio({ oil, onOilChange }: Props) {
-  const [tab, setTab] = useState<Tab>('style');
+  // ?stage=plan — прямая ссылка на этап, как ?gen= и ?print=.
+  const [tab, setTab] = useState<Tab>(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get('stage');
+    return TABS.some((item) => item.id === fromQuery) ? (fromQuery as Tab) : 'style';
+  });
   const [params, setParams] = useState<Params>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}.params`);
@@ -463,16 +517,20 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
   const controlValue = (key: ControlKey): number => params[key];
 
+  const stage = TAB_BY_ID[tab];
+  const analyzing = stage.kind === 'analyze';
+
   return (
     <>
       <div className="studio-tabs">
-        {TABS.map((item) => (
+        {TABS.map((item, index) => (
           <button
             key={item.id}
             className={tab === item.id ? 'on' : ''}
             title={item.hint}
             onClick={() => setTab(item.id)}
           >
+            <span className="step-num">{index + 1}</span>
             <Icon name={item.icon} size={14} />
             {item.label}
             {item.id === 'saved' && favorites.length > 0 && (
@@ -482,8 +540,10 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
         ))}
       </div>
 
-      <main className="layout studio">
-        <aside className="panel editor">
+      <main className={`layout studio stage-${stage.kind}`}>
+        <aside className="panel editor" hidden={stage.kind !== 'create'}>
+          <p className="stage-tip"><Icon name={stage.icon} size={14} />{stage.tip}</p>
+
           {tab === 'style' && (
             <>
               {customLoaded && (
@@ -716,70 +776,18 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
             </>
           )}
 
-          {tab === 'plan' && (
-            <>
-              <section className="dom-production">
-                <h2><Icon name="factory" />Как это собирать</h2>
-                <dl>
-                  <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
-                  <div><dt>Брусков заготовить</dt><dd>{plan.totals.stripsToPrepare}</dd></div>
-                  <div><dt>Поперечных резов</dt><dd>{plan.totals.crosscuts}</dd></div>
-                  <div><dt>Планок в доске</dt><dd>{plan.cols}</dd></div>
-                </dl>
-              </section>
-
-              <section className="dom-production">
-                <h2><Icon name="layers" />Щиты</h2>
-                <div className="panels-list">
-                  {plan.panels.map((panel) => (
-                    <div
-                      key={panel.index}
-                      className="panel-card"
-                      onMouseEnter={() => setHighlightPanel(panel.index)}
-                      onMouseLeave={() => setHighlightPanel(null)}
-                    >
-                      <div className="panel-head">
-                        <b>Щит {panel.index}</b>
-                        <span>
-                          {panel.slices} {plural(panel.slices, 'планка', 'планки', 'планок')} ·{' '}
-                          {Math.round(panel.roughLengthMm)} мм
-                        </span>
-                      </div>
-                      <div className="panel-order">
-                        {panel.order.map((speciesId, index) => (
-                          <span
-                            key={index}
-                            className="cell-dot"
-                            title={speciesMap[speciesId]?.name}
-                            style={{ background: speciesMap[speciesId]?.colorHex }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="note-small">Наведи на щит — его колонки подсветятся на доске.</p>
-              </section>
-            </>
-          )}
-
-          {tab === 'saved' && (
-            <section>
-              <h2><Icon name="star" />Избранное</h2>
-              <button className="wide primary" onClick={onSaveFavorite}>
-                <Icon name="star" size={13} />Отложить текущий рисунок
-              </button>
-              <p className="note-small">
-                {favorites.length} из {FAVORITES_LIMIT}. Отложенное переживает перезагрузку;
-                при переполнении вытесняются самые старые.
-              </p>
-            </section>
-          )}
         </aside>
 
         <section className="stage">
           {tab === 'saved' ? (
             <div className="gallery">
+              <div className="gallery-head">
+                <p className="stage-tip"><Icon name={stage.icon} size={14} />{stage.tip}</p>
+                <button className="primary" onClick={onSaveFavorite}>
+                  <Icon name="star" size={13} />Отложить текущий рисунок
+                </button>
+                <span className="note-small">{favorites.length} из {FAVORITES_LIMIT}</span>
+              </div>
               {favorites.length === 0 && (
                 <p className="empty">
                   Пока пусто. Нарисуй что-нибудь и нажми «Отложить» — можно спокойно
@@ -832,6 +840,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
                 />
               </div>
 
+              {/* На этапах чтения цифры выносим прямо под превью: там они и нужны. */}
               <p className="hint">
                 {size.cols} × {size.rows} клеток по {params.cellMm} мм ·{' '}
                 {plan.totals.glueUps} {plural(plan.totals.glueUps, 'щит', 'щита', 'щитов')} ·{' '}
@@ -840,7 +849,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
               </p>
 
               <div className="oil">
-                <label>Масло / проявка текстуры</label>
+                <label>Масло</label>
                 <input
                   type="range" min={0} max={100}
                   value={Math.round(oil * 100)}
@@ -848,81 +857,156 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
                 />
                 <span>{Math.round(oil * 100)}%</span>
               </div>
+
+              {analyzing && (
+                <section className="stage-summary">
+                  <h2><Icon name="board" />Готовая доска</h2>
+                  <div className="big">
+                    {formatLength(dims.topLengthMm, 'mm')} × {formatLength(dims.topWidthMm, 'mm')} × {formatLength(dims.thicknessMm, 'mm')}
+                  </div>
+                  <dl>
+                    <div><dt>Сырой объём</dt><dd>{plan.totals.rawVolumeM3.toFixed(5)} м³</dd></div>
+                    <div><dt>В доске</dt><dd>{plan.totals.netVolumeM3.toFixed(5)} м³</dd></div>
+                    <div className="accent"><dt>Отходы</dt><dd>{plan.totals.wastePct.toFixed(1)}%</dd></div>
+                    <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
+                  </dl>
+                </section>
+              )}
             </>
           )}
         </section>
 
-        <aside className="panel report">
-          <section>
-            <h2><Icon name="board" />Готовая доска</h2>
-            <div className="big">
-              {formatLength(dims.topLengthMm, 'mm')} × {formatLength(dims.topWidthMm, 'mm')} × {formatLength(dims.thicknessMm, 'mm')}
-            </div>
-            <dl>
-              <div><dt>Сырой объём</dt><dd>{plan.totals.rawVolumeM3.toFixed(5)} м³</dd></div>
-              <div><dt>В доске</dt><dd>{plan.totals.netVolumeM3.toFixed(5)} м³</dd></div>
-              <div className="accent"><dt>Отходы</dt><dd>{plan.totals.wastePct.toFixed(1)}%</dd></div>
-              <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
-            </dl>
-          </section>
+        {/* Правая колонка держит только то, что относится к текущему этапу.
+            Раньше здесь висело всё сразу — отсюда и брался визуальный шум. */}
+        <aside className="panel report" hidden={stage.kind === 'gallery'}>
+          {analyzing && <p className="stage-tip"><Icon name={stage.icon} size={14} />{stage.tip}</p>}
 
-          <WorkshopPanel />
-
-          <EconomicsPanel
-            input={{
-              strips: plan.totals.stripsToPrepare,
-              glueUps: plan.totals.glueUps,
-              crosscuts: plan.totals.crosscuts,
-              lengthMm: dims.topLengthMm,
-              widthMm: dims.topWidthMm,
-              materialCostRub: plan.totals.totalCost,
-            }}
-          />
-
-          <MoisturePanel usage={moistureUsage} species={speciesMap} />
-
-          <section className="dom-production">
-            <h2><Icon name="rotate" />Способ сборки</h2>
-            {analysis.block ? (
-              <p className="advice">
-                Рисунок повторяется блоком <b>{analysis.block.blockCols}×{analysis.block.blockRows}</b>{' '}
-                ({analysis.block.repeatsX}×{analysis.block.repeatsY} раз). Собери один блок и
-                размножь его: короткие струбцины вместо длинных, блоки клеятся параллельно,
-                а брак в одном блоке не убивает всю доску.
-              </p>
-            ) : (
+          {stage.kind === 'create' && (
+            <section className="quick-summary">
+              <h2><Icon name="board" />Что получается</h2>
+              <div className="big">
+                {formatLength(dims.topLengthMm, 'mm')} × {formatLength(dims.topWidthMm, 'mm')}
+              </div>
+              <dl>
+                <div><dt>Толщина</dt><dd>{formatLength(dims.thicknessMm, 'mm')}</dd></div>
+                <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
+                <div className="accent"><dt>Отходы</dt><dd>{plan.totals.wastePct.toFixed(1)}%</dd></div>
+                <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
+              </dl>
               <p className="note-small">
-                Рисунок не повторяется — доска собирается одной склейкой из {plan.cols} планок.
+                Полный расчёт — на этапах «Производство» и «Экономика».
               </p>
-            )}
-            {analysis.symmetry.vertical && (
-              <p className="advice">
-                Рисунок зеркален по вертикали — половина планок получается переворотом
-                на 180°, поэтому щитов вдвое меньше.
-              </p>
-            )}
-          </section>
+            </section>
+          )}
 
-          <section>
-            <h2><Icon name="shield" />Столярный чек</h2>
-            <ul className="warnings">
-              {!plan.valid && plan.issues.map((issue) => <li key={issue}>{issue}</li>)}
-              {plan.totals.glueUps > 8 && !analysis.block && (
-                <li>
-                  {plan.totals.glueUps} щитов — это {plan.totals.glueUps} отдельных склеек.
-                  Симметричный или повторяющийся рисунок обойдётся дешевле.
-                </li>
-              )}
-              {params.cellMm < 15 && <li>Клетка меньше 15 мм — бруски тонкие, склейка капризная.</li>}
-              {plan.cols > 30 && <li>Больше 30 планок за одну склейку не стянуть: клей подгруппами.</li>}
-              {paletteTooSmall && <li>Пород меньше, чем нужно стилю — узор выйдет бедным.</li>}
-            </ul>
-            {plan.valid && plan.totals.glueUps <= 8 && params.cellMm >= 15 && plan.cols <= 30 && !paletteTooSmall && (
-              <p className="ok">Рисунок изготовим как есть.</p>
-            )}
-          </section>
+          {tab === 'plan' && (
+            <>
+              <section className="dom-production">
+                <h2><Icon name="factory" />Как это собирать</h2>
+                <dl>
+                  <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
+                  <div><dt>Брусков заготовить</dt><dd>{plan.totals.stripsToPrepare}</dd></div>
+                  <div><dt>Поперечных резов</dt><dd>{plan.totals.crosscuts}</dd></div>
+                  <div><dt>Планок в доске</dt><dd>{plan.cols}</dd></div>
+                </dl>
+              </section>
 
-          <section>
+              <section className="dom-production">
+                <h2><Icon name="layers" />Щиты</h2>
+                <div className="panels-list">
+                  {plan.panels.map((panel) => (
+                    <div
+                      key={panel.index}
+                      className="panel-card"
+                      onMouseEnter={() => setHighlightPanel(panel.index)}
+                      onMouseLeave={() => setHighlightPanel(null)}
+                    >
+                      <div className="panel-head">
+                        <b>Щит {panel.index}</b>
+                        <span>
+                          {panel.slices} {plural(panel.slices, 'планка', 'планки', 'планок')} ·{' '}
+                          {Math.round(panel.roughLengthMm)} мм
+                        </span>
+                      </div>
+                      <div className="panel-order">
+                        {panel.order.map((speciesId, index) => (
+                          <span
+                            key={index}
+                            className="cell-dot"
+                            title={speciesMap[speciesId]?.name}
+                            style={{ background: speciesMap[speciesId]?.colorHex }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="note-small">Наведи на щит — его колонки подсветятся на доске.</p>
+              </section>
+
+              <section className="dom-production">
+                <h2><Icon name="rotate" />Способ сборки</h2>
+                {analysis.block ? (
+                  <p className="advice">
+                    Рисунок повторяется блоком <b>{analysis.block.blockCols}×{analysis.block.blockRows}</b>{' '}
+                    ({analysis.block.repeatsX}×{analysis.block.repeatsY} раз). Собери один блок и
+                    размножь его: короткие струбцины вместо длинных, блоки клеятся параллельно,
+                    а брак в одном блоке не убивает всю доску.
+                  </p>
+                ) : (
+                  <p className="note-small">
+                    Рисунок не повторяется — доска собирается одной склейкой из {plan.cols} планок.
+                  </p>
+                )}
+                {analysis.symmetry.vertical && (
+                  <p className="advice">
+                    Рисунок зеркален по вертикали — половина планок получается переворотом
+                    на 180°, поэтому щитов вдвое меньше.
+                  </p>
+                )}
+              </section>
+
+              <section>
+                <h2><Icon name="shield" />Столярный чек</h2>
+                <ul className="warnings">
+                  {!plan.valid && plan.issues.map((issue) => <li key={issue}>{issue}</li>)}
+                  {plan.totals.glueUps > 8 && !analysis.block && (
+                    <li>
+                      {plan.totals.glueUps} щитов — это {plan.totals.glueUps} отдельных склеек.
+                      Симметричный или повторяющийся рисунок обойдётся дешевле.
+                    </li>
+                  )}
+                  {params.cellMm < 15 && <li>Клетка меньше 15 мм — бруски тонкие, склейка капризная.</li>}
+                  {plan.cols > 30 && <li>Больше 30 планок за одну склейку не стянуть: клей подгруппами.</li>}
+                  {paletteTooSmall && <li>Пород меньше, чем нужно стилю — узор выйдет бедным.</li>}
+                </ul>
+                {plan.valid && plan.totals.glueUps <= 8 && params.cellMm >= 15 && plan.cols <= 30 && !paletteTooSmall && (
+                  <p className="ok">Рисунок изготовим как есть.</p>
+                )}
+              </section>
+            </>
+          )}
+
+          {tab === 'money' && (
+            <>
+              <WorkshopPanel />
+
+              <EconomicsPanel
+                input={{
+                  strips: plan.totals.stripsToPrepare,
+                  glueUps: plan.totals.glueUps,
+                  crosscuts: plan.totals.crosscuts,
+                  lengthMm: dims.topLengthMm,
+                  widthMm: dims.topWidthMm,
+                  materialCostRub: plan.totals.totalCost,
+                }}
+              />
+
+              <MoisturePanel usage={moistureUsage} species={speciesMap} />
+            </>
+          )}
+
+          <section className="actions-block">
             <div className="row-actions">
               <button className="primary" onClick={onShare}><Icon name="link" size={14} />Скопировать ДНК</button>
               <button onClick={onSaveFavorite}><Icon name="star" size={14} />Отложить</button>
