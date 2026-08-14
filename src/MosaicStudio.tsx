@@ -29,6 +29,7 @@ import type {
   MosaicRecipe,
   WoodSpecies,
 } from './core';
+import { columnsForText } from './core/textFit';
 import { hitTestCell, renderMosaic } from './render/mosaicBoard';
 import { gridFromMosaic, gridKey, renderBoard3d } from './render/board3d';
 import { useBoardCamera } from './useBoardCamera';
@@ -322,10 +323,14 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
   const setFromText = useCallback(
     (value: string) => {
+      // Сетка расширяется под длину надписи: на 21 колонке слово из шести букв
+      // превращается в тёмную полосу — на знак остаётся три клетки.
+      const cols = columnsForText(value, params.cols);
+      if (cols !== params.cols) setParams((current) => ({ ...current, cols }));
       setMosaic(
         textToMosaic(value, {
           rows: params.rows,
-          cols: params.cols,
+          cols,
           cellMm: params.cellMm,
           background: palette[0] ?? 'maple',
           foreground: palette[palette.length - 1] ?? 'wenge',
@@ -333,7 +338,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
       );
       setCustomLoaded(true);
     },
-    [setMosaic, params.rows, params.cols, params.cellMm, palette]
+    [setMosaic, setParams, params.rows, params.cols, params.cellMm, palette]
   );
 
   const applyPhoto = useCallback(

@@ -55,12 +55,19 @@ export function textToMosaic(text: string, options: TextOptions): Mosaic {
     const line = lines[index];
     // Подбираем кегль так, чтобы строка влезла и по ширине, и по высоте строки.
     let size = lineHeight * 0.95;
-    ctx.font = `${weight} ${size}px ${family}`;
+    const applyFont = (value: number) => {
+      ctx.font = `${weight} ${value}px ${family}`;
+      // Без разрядки соседние буквы на грубой сетке сливаются в одно пятно:
+      // между штрихами не остаётся ни одной светлой клетки.
+      const spaced = ctx as CanvasRenderingContext2D & { letterSpacing?: string };
+      if ('letterSpacing' in spaced) spaced.letterSpacing = `${value * 0.16}px`;
+    };
+    applyFont(size);
     const measured = ctx.measureText(line).width;
     const maxWidth = width * 0.94;
     if (measured > maxWidth) {
       size = Math.max(4, size * (maxWidth / measured));
-      ctx.font = `${weight} ${size}px ${family}`;
+      applyFont(size);
     }
 
     // Верх глифов лежит на baseline − ascent, низ — на baseline + descent.

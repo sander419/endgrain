@@ -11,16 +11,31 @@
 [надпись](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%94%D0%9E%D0%9C) ·
 [инструкция для мастерской](https://hiborg-space.ru/endgrain/?mode=recipe&print=1)
 
+## Демо за 10 секунд
+
+![Демонстрация: рисунок → щиты → карта раскроя → инструкция](public/examples/demo.gif)
+
+Рисунок → компиляция в щиты → карта раскроя → печатная инструкция. Доска в 3D крутится сама,
+пока её не потянули мышью.
+
 ## Примеры
 
-Каждая ссылка — не картинка, а полный проект: рецепт, порядок операций, себестоимость.
-Открывается сразу в нужном рисунке — Board DNA целиком в URL, без сервера и без базы.
+Снято прямо в приложении (`?shot=1` — доска без интерфейса), каждая картинка кликабельна
+и открывает свой проект целиком: рецепт, порядок операций, себестоимость.
+
+| | |
+|---|---|
+| [<img src="public/examples/mandala.png" width="380" alt="Мандала">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala&view=3d)<br>**Мандала** · 21×21 клетка, 4 породы · 11 щитов, 231 брусок | [<img src="public/examples/text-hiborg.png" width="380" alt="Надпись ХИБОРГ">](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93&view=3d)<br>**Надпись** · сетка сама расширяется под длину слова |
+| [<img src="public/examples/maze.png" width="380" alt="Лабиринт">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=maze&view=3d)<br>**Лабиринт** · настоящий проходимый, генерируется обходом | [<img src="public/examples/landscape.png" width="380" alt="Пейзаж">](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=landscape&view=3d)<br>**Пейзаж** · 4 породы, горизонт и отражение |
+| [<img src="public/examples/recipe-checker.png" width="380" alt="Шахматка в режиме Рецепт">](https://hiborg-space.ru/endgrain/?mode=recipe&stage=pattern&view=3d)<br>**Шахматка** · режим «Рецепт», 560×240×40, отходы 21.1% | |
+
+Каждая ссылка ниже — не картинка, а полный проект: Board DNA целиком в URL, без сервера и базы.
 
 | | |
 |---|---|
 | [Зеркальный каньон](https://hiborg-space.ru/endgrain/?mode=recipe#dna=eyJ2IjoxLCJzZWVkIjoxLCJyZWNpcGUiOnsidW5pdHMiOiJtbSIsInNwZWNpZXMiOnsibWFwbGUiOnsiaWQiOiJtYXBsZSIsIm5hbWUiOiLQmtC70ZHQvSIsImNvbG9ySGV4IjoiI0U4QzlBMCIsImRlbnNpdHlLZ00zIjo3MDUsInByaWNlUGVyQ3ViaWNNZXRlciI6OTUwMDB9LCJ3YWxudXQiOnsiaWQiOiJ3YWxudXQiLCJuYW1lIjoi0J7RgNC10YUiLCJjb2xvckhleCI6IiM1QjQwMzQiLCJkZW5zaXR5S2dNMyI6NjEwLCJwcmljZVBlckN1YmljTWV0ZXIiOjE5MDAwMH19LCJwYW5lbCI6eyJzdHJpcHMiOlt7InNwZWNpZXNJZCI6Im1hcGxlIiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoid2FsbnV0Iiwid2lkdGhNbSI6NDB9LHsic3BlY2llc0lkIjoibWFwbGUiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJ3YWxudXQiLCJ3aWR0aE1tIjo0MH0seyJzcGVjaWVzSWQiOiJtYXBsZSIsIndpZHRoTW0iOjQwfSx7InNwZWNpZXNJZCI6IndhbG51dCIsIndpZHRoTW0iOjQwfV0sInN0cmlwVGhpY2tuZXNzTW0iOjQwLCJ1c2FibGVMZW5ndGhNbSI6NjAwfSwiY3Jvc3NjdXQiOnsic2xpY2VUaGlja25lc3NNbSI6NDAsInNhd0tlcmZNbSI6MywiYmxhZGVBbmdsZURlZyI6OTB9LCJ0cmFuc2Zvcm0iOnsiZmxpcE9kZFNsaWNlcyI6ZmFsc2UsImN5Y2xpY1NoaWZ0U3RlcCI6MCwibWFudWFsU2xpY2VzIjpbWzAsMSwyLDMsNCw1XSxbMSwyLDMsNCw1LDBdLFsyLDMsNCw1LDAsMV0sWzMsNCw1LDAsMSwyXSxbNCw1LDAsMSwyLDNdLFs1LDAsMSwyLDMsNF0sWzAsMSwyLDMsNCw1XSxbMCwxLDIsMyw0LDVdLFs1LDAsMSwyLDMsNF0sWzQsNSwwLDEsMiwzXSxbMyw0LDUsMCwxLDJdLFsyLDMsNCw1LDAsMV0sWzEsMiwzLDQsNSwwXSxbMCwxLDIsMyw0LDVdXX0sImFsbG93YW5jZXMiOnsidGhpY2tuZXNzU3VyZmFjaW5nTW0iOjMsInN0cmlwV2lkdGhKb2ludE1tIjoyLCJwYW5lbEVuZFRyaW1NbSI6MzB9fX0) — режим «Рецепт», клён/орех, ручная раскладка планок. 560×240×40, отходы 21.1% |
 | [Мандала «Рельеф»](https://hiborg-space.ru/endgrain/?mode=mosaic&gen=mandala) — режим «Мозаика», 4 породы, 21×21 клетка. 11 щитов, 231 брусок |
-| [Надпись «ХИБОРГ»](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93) — текст в клетках, клён/венге. 5 щитов, 105 брусков |
+| [Надпись «ХИБОРГ»](https://hiborg-space.ru/endgrain/?mode=mosaic&text=%D0%A5%D0%98%D0%91%D0%9E%D0%A0%D0%93) — текст в клетках, клён/венге. 8 щитов, 168 брусков |
 
 **Рисуешь не узор, а рецепт распила — всё остальное считается само.**
 
@@ -62,15 +77,16 @@ npm run dev
 ```
 
 Прод-сборка — `npm run build` (статика в `dist/`, бэкенда нет).
-Тесты — `npm test` (Vitest, 23 теста).
+Тесты — `npm test` (Vitest, 149 тестов).
 
 ## Что умеет
 
 - **Редактор рецепта** — бруски (порода, ширина), толщина, длина щита, толщина среза, пропил.
 - **Трансформации** — переворот нечётных планок на 180°, циклический сдвиг.
 - **Ручная правка узора** — клик по планке на превью: перевернуть, сдвинуть, поменять местами
-  с соседней, сбросить под общие правила. Клавиши: ← → выбор, `F` переворот, `[` `]` сдвиг,
-  `R` сброс, `Esc` снять выбор. Правленые планки помечены уголком.
+  с соседней, сбросить под общие правила. Планка **перетаскивается мышью** на новое место
+  (перенос со сдвигом соседей, место вставки помечено линией). Клавиши: ← → выбор,
+  `F` переворот, `[` `]` сдвиг, `R` сброс, `Esc` снять выбор. Правленые планки помечены уголком.
 - **Отмена** — `Ctrl+Z` / `Ctrl+Shift+Z`, глубина 60 шагов; правки подряд склеиваются в одну.
 - **Набор брусков** — перенос вверх/вниз, дублирование, «зеркалить набор» (A-B-C → A-B-C-C-B-A),
   разворот порядка.
@@ -80,6 +96,14 @@ npm run dev
   объём, board feet, потери на пропил и торцовку, масса, себестоимость по породам.
 - **Столярный чек** — блокирующие ошибки и предупреждения (тонкий брусок, склейка, которую не
   стянуть, конфликт усушки, бесполезный переворот при симметричном наборе).
+- **3D-превью** — доска в объёме на этапе «Доска»: тянешь мышью — поворачивается, пока не
+  тронули — крутится сама. Прямая ссылка `?view=3d`. Работает и в «Мозаике». Без three.js:
+  камера ортографическая, поэтому верхняя грань кладётся на экран готовой текстурой торцов
+  аффинным преобразованием, а боковины — четыре плоскости с продольным волокном.
+- **Карта раскроя** — сколько досок купить и как разложить бруски. Раскрой гильотинный
+  (торцовка на полосы → роспуск вдоль), каждый рез съедает пропил. Нетронутый хвост доски
+  считается остатком на следующий проект, а не отходом; отход считается от распиленной части.
+  Схема по каждой доске — на экране и в печатной инструкции.
 - **Масло** — слайдер проявки текстуры (темнеет тон, растёт насыщенность).
 - **Board DNA** — весь проект в ссылке `#dna=…`, открывается у любого без установки.
 - **Инструкция для мастерской** — печатный лист (Ctrl+P → PDF): спецификация брусков с припусками,
@@ -219,12 +243,16 @@ thickness = sliceThickness            толщина готовой доски
 - Только прямой рез 90° (косые — отдельная задача).
 - Толщина всех брусков в щите одинаковая.
 - Клеевые швы не считаются отдельным объёмом.
-- Раскрой по складским доскам (bin packing) не делается — считается потребность в материале.
+- Раскрой гильотинный и жадный (first-fit по убыванию): раскладка не гарантированно
+  оптимальная, зато выполнимая на циркулярке. Обрезки между полосами повторно не
+  используются — только целый хвост доски.
+- 3D-превью без освещения и теней на самой доске: ортографическая камера, плоская заливка
+  боковин. Это превью формы, а не рендер.
 
 ## Стек
 
 React 19 + TypeScript + Vite, Canvas 2D, Vitest. Ни бэкенда, ни аккаунтов, ни зависимостей
-в рантайме, кроме React. Прод-бандл — 82 КБ gzip.
+в рантайме, кроме React. Прод-бандл — 103 КБ gzip.
 
 ## Деплой
 

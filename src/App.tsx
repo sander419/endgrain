@@ -528,12 +528,19 @@ export default function App() {
   // ?print=1 — предпросмотр инструкции прямо на экране, без диалога печати.
   const printPreview = typeof window !== 'undefined' && window.location.search.includes('print=1');
 
+  /**
+   * ?shot=1 — только доска на весь экран, без панелей и подсказок. Нужен для
+   * снимков в галерею и для демо: обрезать интерфейс кропом нельзя, раскладка
+   * у режимов разная и кнопки лезут в кадр.
+   */
+  const shotMode = typeof window !== 'undefined' && window.location.search.includes('shot=1');
+
   useEffect(() => {
     if (printPreview) setBoardImage(captureBoardImage());
   }, [printPreview, captureBoardImage]);
 
   return (
-    <div className={printPreview ? 'app show-print' : 'app'}>
+    <div className={['app', printPreview ? 'show-print' : '', shotMode ? 'shot' : ''].filter(Boolean).join(' ')}>
       <header className="topbar">
         <div className="brand">
           <svg className="logo" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
