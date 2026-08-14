@@ -89,6 +89,27 @@ export function swapSlices(recipe: Recipe, a: number, b: number): Recipe {
   return { ...recipe, transform: { ...recipe.transform, sliceOrder: order } };
 }
 
+/**
+ * Перенести планку на новую позицию со сдвигом остальных — то, что ожидается
+ * от перетаскивания мышью. Обмен местами (`swapSlices`) для этого не годится:
+ * при переносе через несколько позиций он рвёт порядок соседей.
+ */
+export function moveSlice(recipe: Recipe, from: number, to: number): Recipe {
+  const total = sliceCount(recipe);
+  if (from < 0 || to < 0 || from >= total || to >= total || from === to) return recipe;
+
+  const order = Array.from({ length: total }, (_, position) => {
+    const requested = recipe.transform.sliceOrder?.[position];
+    return Number.isInteger(requested) && requested !== undefined && requested >= 0 && requested < total
+      ? requested
+      : position;
+  });
+  const [moved] = order.splice(from, 1);
+  order.splice(to, 0, moved);
+
+  return { ...recipe, transform: { ...recipe.transform, sliceOrder: order } };
+}
+
 /** Сколько планок отредактированы руками. */
 export function manualSliceCount(recipe: Recipe): number {
   return (recipe.transform.manualSlices ?? []).filter((row) => Array.isArray(row)).length;

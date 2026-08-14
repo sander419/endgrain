@@ -10,6 +10,10 @@ export interface RenderOptions {
   background?: string;
   /** Планка, выбранная для ручной правки. */
   selectedSlice?: number | null;
+  /** Планка, которую тащат мышью. */
+  dragSlice?: number | null;
+  /** Позиция, куда она встанет, если отпустить. */
+  dragTarget?: number | null;
 }
 
 export interface SliceRect {
@@ -278,6 +282,25 @@ function renderBoard(
   ctx.strokeStyle = 'rgba(0,0,0,0.6)';
   ctx.lineWidth = 2;
   ctx.strokeRect(vp.offsetX, vp.offsetY, totalLength * vp.scale, widthMm * vp.scale);
+
+  // Перетаскивание: планка под курсором притушена, а место вставки помечено
+  // линией по краю — иначе непонятно, встанет она левее или правее соседа.
+  if (typeof opts.dragSlice === 'number' && rects[opts.dragSlice]) {
+    const rect = rects[opts.dragSlice];
+    ctx.fillStyle = 'rgba(20,16,13,0.45)';
+    ctx.fillRect(rect.x, vp.offsetY, rect.w, widthMm * vp.scale);
+  }
+  if (typeof opts.dragTarget === 'number' && rects[opts.dragTarget]) {
+    const rect = rects[opts.dragTarget];
+    const after = typeof opts.dragSlice === 'number' && opts.dragTarget > opts.dragSlice;
+    const x = after ? rect.x + rect.w : rect.x;
+    ctx.strokeStyle = '#ff8a3d';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, vp.offsetY - 6);
+    ctx.lineTo(x, vp.offsetY + widthMm * vp.scale + 6);
+    ctx.stroke();
+  }
 
   if (typeof opts.selectedSlice === 'number' && rects[opts.selectedSlice]) {
     const rect = rects[opts.selectedSlice];

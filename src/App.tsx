@@ -25,6 +25,7 @@ import {
   mirrorStrips,
   moveStrip,
   resetAllSlices,
+  moveSlice,
   resetSlice,
   reverseStrips,
   shiftSlice,
@@ -33,6 +34,8 @@ import {
 import { hitTestSlice, renderScene } from './render/board';
 import { gridFromRecipe, gridKey, renderBoard3d } from './render/board3d';
 import { useBoardCamera } from './useBoardCamera';
+import { NestingPanel } from './NestingPanel';
+import type { NestPiece } from './core/nesting';
 import { PrintSheet } from './PrintSheet';
 import { useHistoryState } from './useHistoryState';
 import { MosaicStudio } from './MosaicStudio';
@@ -118,7 +121,7 @@ const RECIPE_STAGES: RecipeStageMeta[] = [
   },
   {
     id: 'pattern', label: 'Узор', icon: 'grid', kind: 'create', view: 'final',
-    tip: 'Пресет задаёт узор целиком, а клик по планке правит её отдельно: перевернуть, сдвинуть, поменять местами. Ctrl+Z отменяет.',
+    tip: 'Пресет задаёт узор целиком, а клик по планке правит её отдельно: перевернуть, сдвинуть, поменять местами. Планку можно перетащить мышью на новое место. Ctrl+Z отменяет.',
   },
   {
     id: 'plan', label: 'Производство', icon: 'factory', kind: 'analyze', view: 'final',
@@ -144,6 +147,11 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
+  // Перетаскивание планки: откуда взяли, куда встанет, было ли движение.
+  // Истина живёт в ref, состояние нужно только для подсветки: события указателя
+  // приходят пачкой и читать из замыкания уже устаревшее значение нельзя.
+  const dragRef = useRef<{ from: number; target: number; moved: boolean } | null>(null);
+  const [drag, setDrag] = useState<{ from: number; target: number; moved: boolean } | null>(null);
   const [stage, setStage] = useState<RecipeStage>(() => {
     // ?stage=plan — прямая ссылка на этап, как в мозаике.
     const fromQuery = new URLSearchParams(window.location.search).get('stage');
@@ -174,6 +182,18 @@ export default function App() {
   const grid3d = useMemo(() => gridFromRecipe(recipe, projection, oil), [recipe, projection, oil]);
   // Ключ считается один раз на изменение рисунка, а не в каждом кадре вращения.
   const grid3dKey = useMemo(() => gridKey(grid3d), [grid3d]);
+
+  // Список брусков щита — вход карты раскроя. Он же уходит в печатный лист.
+  const stockPieces = useMemo<NestPiece[]>(
+    () =>
+      projection.cutList.map((piece) => ({
+        pieceId: piece.pieceId,
+        speciesId: piece.speciesId,
+        lengthMm: piece.lengthMm,
+        widthMm: piece.widthMm,
+      })),
+    [projection.cutList]
+  );
   const warnings = useMemo(() => checkJoinery(recipe), [recipe]);
   const manualCount = manualSliceCount(recipe);
 
@@ -258,9 +278,13 @@ export default function App() {
       });
       return;
     }
-    renderScene(ctx, recipe, projection, { step, oil, explode, selectedSlice });
+    renderScene(ctx, recipe, projection, {
+      step, oil, explode, selectedSlice,
+      dragSlice: drag?.from ?? null,
+      dragTarget: drag && drag.moved ? drag.target : null,
+    });
   }, [
-    recipe, projection, step, oil, explode, selectedSlice,
+    recipe, projection, step, oil, explode, selectedSlice, drag,
     show3d, grid3d, grid3dKey, camera3d.camera,
   ]);
 
@@ -281,21 +305,62 @@ export default function App() {
     );
   }, [projection.sliceCount]);
 
-  const onCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  /** Планка под курсором. Общая точка для клика и для перетаскивания. */
+  const sliceAt = (event: React.PointerEvent<HTMLCanvasElement>): number | null => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return null;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const hit = hitTestSlice(
+    return hitTestSlice(
       ctx, recipe, projection,
       { step, oil, explode },
-      (event.clientX - rect.left) * scaleX,
-      (event.clientY - rect.top) * scaleY
+      (event.clientX - rect.left) * (canvas.width / rect.width),
+      (event.clientY - rect.top) * (canvas.height / rect.height)
     );
-    setSelectedSlice((current) => (hit === current ? null : hit));
+  };
+
+  const onSlicePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const hit = sliceAt(event);
+    if (hit === null) {
+      setSelectedSlice(null);
+      return;
+    }
+    const next = { from: hit, target: hit, moved: false };
+    dragRef.current = next;
+    setDrag(next);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onSlicePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const current = dragRef.current;
+    if (!current) return;
+    const hit = sliceAt(event);
+    if (hit === null || hit === current.target) return;
+    const next = { from: current.from, target: hit, moved: true };
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  const onSlicePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* указатель уже отпущен */
+    }
+    const current = dragRef.current;
+    dragRef.current = null;
+    setDrag(null);
+    if (!current) return;
+
+    // Без движения это обычный клик — он по-прежнему выбирает планку.
+    if (!current.moved || current.target === current.from) {
+      setSelectedSlice((selected) => (selected === current.from ? null : current.from));
+      return;
+    }
+    setRecipe((r) => moveSlice(r, current.from, current.target));
+    setSelectedSlice(current.target);
+    flash(`Планка ${current.from + 1} → позиция ${current.target + 1}`);
   };
 
   const editSelected = (fn: (recipe: Recipe, sliceIndex: number) => Recipe) => {
@@ -693,11 +758,19 @@ export default function App() {
           <div className="canvas-wrap">
             <canvas
               ref={canvasRef}
-              onClick={show3d ? undefined : onCanvasClick}
               className={
                 show3d ? 'grabbable' : step === 'final' || step === 'flip' ? 'pickable' : ''
               }
-              {...(show3d ? camera3d.handlers : {})}
+              {...(show3d
+                ? camera3d.handlers
+                : step === 'final' || step === 'flip'
+                  ? {
+                      onPointerDown: onSlicePointerDown,
+                      onPointerMove: onSlicePointerMove,
+                      onPointerUp: onSlicePointerUp,
+                      onPointerCancel: onSlicePointerUp,
+                    }
+                  : {})}
             />
             {step === 'final' && (
               <div className="view-toggle">
@@ -729,7 +802,8 @@ export default function App() {
             <div className={selectedSlice === null ? 'slice-bar empty' : 'slice-bar'}>
               {selectedSlice === null ? (
                 <span className="slice-help">
-                  Кликни планку на доске, чтобы править её отдельно. Или стрелками ← →
+                  Кликни планку, чтобы править её отдельно, или перетащи мышью на новое
+                  место. Выбор — стрелками ← →
                 </span>
               ) : (
                 <>
@@ -827,6 +901,14 @@ export default function App() {
               </tbody>
             </table>
           </section>
+
+          {stage === 'plan' && (
+            <NestingPanel
+              pieces={stockPieces}
+              kerfMm={recipe.crosscut.sawKerfMm}
+              species={recipe.species}
+            />
+          )}
 
           {stage === 'money' && (
             <>

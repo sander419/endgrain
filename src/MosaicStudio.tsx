@@ -32,6 +32,8 @@ import type {
 import { hitTestCell, renderMosaic } from './render/mosaicBoard';
 import { gridFromMosaic, gridKey, renderBoard3d } from './render/board3d';
 import { useBoardCamera } from './useBoardCamera';
+import { NestingPanel } from './NestingPanel';
+import type { NestPiece } from './core/nesting';
 import { textToMosaic } from './render/textMosaic';
 import { imageToMosaic } from './render/imageMosaic';
 import { MosaicPrintSheet } from './MosaicPrintSheet';
@@ -408,6 +410,22 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     [mosaic, speciesMap, oil]
   );
   const grid3dKey = useMemo(() => gridKey(grid3d), [grid3d]);
+
+  /**
+   * Бруски для карты раскроя: у мозаики их заготавливают по щитам, поэтому
+   * длина берётся у щита, а ширина — у клетки с припуском на строжку кромок.
+   */
+  const stockPieces = useMemo<NestPiece[]>(() => {
+    const jointMm = recipe.allowances.stripWidthJointMm;
+    return plan.panels.flatMap((panel) =>
+      panel.order.map((speciesId, index) => ({
+        pieceId: `p${panel.index}-${index}`,
+        speciesId,
+        lengthMm: panel.roughLengthMm,
+        widthMm: mosaic.cellMm + jointMm,
+      }))
+    );
+  }, [plan.panels, mosaic.cellMm, recipe.allowances.stripWidthJointMm]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1004,6 +1022,8 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
                 <p className="note-small">Наведи на щит — его колонки подсветятся на доске.</p>
               </section>
 
+              <NestingPanel pieces={stockPieces} kerfMm={sawKerfMm} species={speciesMap} />
+
               <section className="dom-production">
                 <h2><Icon name="rotate" />Способ сборки</h2>
                 {analysis.block ? (
@@ -1085,6 +1105,7 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
         plan={plan}
         species={speciesMap}
         cellMm={params.cellMm}
+        kerfMm={sawKerfMm}
         boardImage={boardImage}
       />
     </>

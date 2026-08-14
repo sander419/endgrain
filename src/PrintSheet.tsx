@@ -11,6 +11,8 @@ import {
   plural,
 } from './core';
 import { loadTools } from './WorkshopPanel';
+import { nestPieces } from './core/nesting';
+import { loadStock } from './core/stock';
 
 interface Props {
   recipe: Recipe;
@@ -55,6 +57,19 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
     if (found) found.count += 1;
     else groups.set(key, { speciesId: strip.speciesId, widthMm: strip.widthMm, count: 1 });
   }
+
+  // Карта раскроя считается по тому же размеру доски, что выбран на экране.
+  const stock = loadStock();
+  const nest = nestPieces(
+    projection.cutList.map((piece) => ({
+      pieceId: piece.pieceId,
+      speciesId: piece.speciesId,
+      lengthMm: piece.lengthMm,
+      widthMm: piece.widthMm,
+    })),
+    stock,
+    recipe.crosscut.sawKerfMm
+  );
 
   const economics = calculateEconomics(
     {
@@ -123,6 +138,40 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
         по толщине +{formatLength(recipe.allowances.thicknessSurfacingMm, units)} на рейсмус,
         по длине +{formatLength(recipe.allowances.panelEndTrimMm, units)} на торцовку щита.
       </p>
+
+      <h2>Карта раскроя</h2>
+      <p className="note">
+        Раскрой гильотинный: доска торцуется на куски нужной длины, потом каждый кусок
+        распускается вдоль. Пропил — {formatLength(recipe.crosscut.sawKerfMm, units)}.
+      </p>
+      {nest.unplaced.length > 0 && (
+        <p className="note">
+          Внимание: {nest.unplaced.length} брусков не влезают в доску{' '}
+          {stock.lengthMm}×{stock.widthMm} мм — нужен материал длиннее.
+        </p>
+      )}
+      <table>
+        <thead>
+          <tr>
+            <th>Доска {stock.lengthMm}×{stock.widthMm}</th>
+            <th>Брусков</th>
+            <th>Режем</th>
+            <th>Выход</th>
+            <th>Остаток</th>
+          </tr>
+        </thead>
+        <tbody>
+          {nest.boards.map((board) => (
+            <tr key={`${board.speciesId}-${board.index}`}>
+              <td>{recipe.species[board.speciesId]?.name ?? board.speciesId} №{board.index}</td>
+              <td>{board.pieces.length} шт</td>
+              <td>{formatLength(board.usedLengthMm, units)}</td>
+              <td>{board.yieldPct.toFixed(0)}%</td>
+              <td>{formatLength(board.offcutLengthMm, units)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <h2>2. Первая склейка — щит A</h2>
       <ol>

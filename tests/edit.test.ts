@@ -14,6 +14,7 @@ import {
   setSlice,
   shiftSlice,
   sliceCount,
+  moveSlice,
   swapSlices,
 } from '../src/core';
 import type { Recipe } from '../src/core';
@@ -88,6 +89,33 @@ describe('порядок планок', () => {
     const after = rows(swapSlices(base, 0, 1));
     expect(after[0]).toEqual(before[1]);
     expect(after[1]).toEqual(before[0]);
+  });
+
+  it('перетаскивание переносит планку со сдвигом соседей, а не меняет местами', () => {
+    const base = flipSlice(defaultRecipe(), 0);
+    const before = rows(base);
+    const after = rows(moveSlice(base, 0, 3));
+    expect(after[3]).toEqual(before[0]);
+    // Соседи подтянулись на позицию влево, порядок между ними сохранился.
+    expect(after[0]).toEqual(before[1]);
+    expect(after[1]).toEqual(before[2]);
+    expect(after[2]).toEqual(before[3]);
+  });
+
+  it('перенос назад работает так же', () => {
+    const base = flipSlice(defaultRecipe(), 3);
+    const before = rows(base);
+    const after = rows(moveSlice(base, 3, 1));
+    expect(after[1]).toEqual(before[3]);
+    expect(after[2]).toEqual(before[1]);
+    expect(after[3]).toEqual(before[2]);
+  });
+
+  it('перенос на ту же позицию и за границы ничего не меняет', () => {
+    const base = defaultRecipe();
+    expect(moveSlice(base, 2, 2)).toBe(base);
+    expect(moveSlice(base, -1, 2)).toBe(base);
+    expect(moveSlice(base, 0, 999)).toBe(base);
   });
 });
 

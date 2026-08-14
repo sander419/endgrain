@@ -1,4 +1,6 @@
 import type { MosaicPlan, WoodSpecies } from './core';
+import { nestPieces } from './core/nesting';
+import { loadStock } from './core/stock';
 import {
   CLIMATE_PRESETS,
   analyseMovement,
@@ -12,6 +14,8 @@ interface Props {
   plan: MosaicPlan;
   species: Record<string, WoodSpecies>;
   cellMm: number;
+  /** Ширина пропила — она же входит в карту раскроя. */
+  kerfMm: number;
   boardImage: string | null;
 }
 
@@ -20,7 +24,7 @@ interface Props {
  * в каждом и карта, какая планка доски из какого щита и какой стороной.
  * Без неё рисунок из нескольких щитов не собрать.
  */
-export function MosaicPrintSheet({ plan, species, cellMm, boardImage }: Props) {
+export function MosaicPrintSheet({ plan, species, cellMm, kerfMm, boardImage }: Props) {
   const dims = plan.finalDimensions;
   const name = (id: string) => species[id]?.name ?? id;
 
@@ -34,6 +38,21 @@ export function MosaicPrintSheet({ plan, species, cellMm, boardImage }: Props) {
   assembly.sort((a, b) => a.col - b.col);
 
   const piecesTotal = plan.materials.reduce((sum, material) => sum + material.pieces, 0);
+
+  // Карта раскроя — по тому же размеру покупной доски, что выбран на экране.
+  const stock = loadStock();
+  const nest = nestPieces(
+    plan.panels.flatMap((panel) =>
+      panel.order.map((speciesId, index) => ({
+        pieceId: `p${panel.index}-${index}`,
+        speciesId,
+        lengthMm: panel.roughLengthMm,
+        widthMm: cellMm + 2,
+      }))
+    ),
+    stock,
+    kerfMm
+  );
 
   const economics = calculateEconomics(
     {
@@ -98,6 +117,33 @@ export function MosaicPrintSheet({ plan, species, cellMm, boardImage }: Props) {
             <td>{plan.totals.rawVolumeM3.toFixed(5)} м³</td>
             <td>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</td>
           </tr>
+        </tbody>
+      </table>
+
+      <h2>Карта раскроя</h2>
+      <p className="note">
+        Раскрой гильотинный: доска {stock.lengthMm}×{stock.widthMm} мм торцуется на куски
+        нужной длины, потом каждый кусок распускается вдоль на бруски.
+      </p>
+      {nest.unplaced.length > 0 && (
+        <p className="note">
+          Внимание: {nest.unplaced.length} брусков длиннее покупной доски — нужен материал длиннее.
+        </p>
+      )}
+      <table>
+        <thead>
+          <tr><th>Доска</th><th>Брусков</th><th>Режем</th><th>Выход</th><th>Остаток</th></tr>
+        </thead>
+        <tbody>
+          {nest.boards.map((board) => (
+            <tr key={`${board.speciesId}-${board.index}`}>
+              <td>{name(board.speciesId)} №{board.index}</td>
+              <td>{board.pieces.length} шт</td>
+              <td>{Math.round(board.usedLengthMm)} мм</td>
+              <td>{board.yieldPct.toFixed(0)}%</td>
+              <td>{Math.round(board.offcutLengthMm)} мм</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
