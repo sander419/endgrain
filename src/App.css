@@ -375,6 +375,82 @@ input[type="number"]:focus-visible, select:focus-visible, button:focus-visible {
   pointer-events: none;
 }
 
+/* ── Шпаргалка «как пользоваться» ──────────────────── */
+
+.help-open {
+  font-size: 12px;
+  padding: 6px 12px;
+  color: var(--muted);
+}
+
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(8, 6, 5, 0.72);
+  overflow-y: auto;
+}
+
+.help {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+}
+
+.help header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.help h2 { margin: 0; font-size: 19px; }
+.help h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--dom-production); }
+
+.help-lead { margin: 0 0 14px; color: var(--text); }
+
+.help-steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.help-steps b { color: var(--text); }
+
+.help-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.help-cols p { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.help-cols b { color: var(--text); }
+
+.help-note { margin: 14px 0 16px; font-size: 13px; color: var(--muted); }
+
+.help-actions { display: flex; justify-content: flex-end; }
+
+@media (max-width: 640px) {
+  .help-cols { grid-template-columns: 1fr; gap: 12px; }
+  .help { padding: 16px; }
+}
+
 /* ── Режим снимка: только доска ────────────────────── */
 
 .app.shot .topbar,
