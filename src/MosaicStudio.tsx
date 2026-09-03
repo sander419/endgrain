@@ -52,6 +52,7 @@ import { EconomicsPanel } from './EconomicsPanel';
 import { useWorkshop } from './WorkshopContext';
 import { ArticleDialog, EstMark, ReadinessBadge, WarningList } from './JoineryCheck';
 import { BatchPanel } from './BatchPanel';
+import { FactLogPanel } from './FactLogPanel';
 import { WorkshopPanel } from './WorkshopPanel';
 import { useHistoryState } from './useHistoryState';
 import { Icon } from './Icon';
@@ -1173,6 +1174,20 @@ export function MosaicStudio({ oil, onOilChange, boardRef, navRef, printingDocum
                   }}
                   pieces={stockPieces}
                   kerfMm={sawKerfMm}
+                />
+              )}
+
+              {pro && (
+                <FactLogPanel
+                  input={{
+                    strips: plan.totals.stripsToPrepare,
+                    glueUps: plan.totals.glueUps,
+                    crosscuts: plan.totals.crosscuts,
+                    lengthMm: dims.topLengthMm,
+                    widthMm: dims.topWidthMm,
+                    materialCostRub: plan.totals.totalCost,
+                  }}
+                  facts={boardRef?.current?.facts ?? null}
                 />
               )}
 

@@ -12,7 +12,7 @@
  * Старые ключи читаются при первом запуске и не удаляются: обновление
  * приложения не должно обнулять то, что человек уже настроил.
  */
-import { DEFAULT_RATES, type WorkshopRates } from './economics';
+import { DEFAULT_RATES, DEFAULT_TIME_NORMS, type TimeNorms, type WorkshopRates } from './economics';
 import { DEFAULT_STOCK } from './stock';
 import { DEFAULT_TOOLS, type ToolId, TOOLS } from './workshop';
 import type { StockBoard } from './nesting';
@@ -37,6 +37,11 @@ export interface WorkshopProfile {
   logoDataUri: string;
   tools: ToolId[];
   rates: WorkshopRates;
+  /**
+   * Нормативы времени. В умолчании — оценка для мастерской-одиночки; журнал
+   * факта заменяет её на измеренную этой мастерской.
+   */
+  norms: TimeNorms;
   /** Размер доски, которую мастерская покупает, когда своей не хватает. */
   stock: StockBoard;
   /** Что уже лежит на складе. Пусто — считаем, что покупается всё. */
@@ -50,6 +55,7 @@ export const DEFAULT_PROFILE: WorkshopProfile = {
   logoDataUri: '',
   tools: DEFAULT_TOOLS,
   rates: DEFAULT_RATES,
+  norms: DEFAULT_TIME_NORMS,
   stock: DEFAULT_STOCK,
   inventory: [],
 };
@@ -97,6 +103,7 @@ export function sanitizeProfile(input: unknown): WorkshopProfile {
   const raw = input as Record<string, unknown>;
   const rates = (raw.rates ?? {}) as Record<string, unknown>;
   const stock = (raw.stock ?? {}) as Record<string, unknown>;
+  const norms = (raw.norms ?? {}) as Record<string, unknown>;
 
   const tools = Array.isArray(raw.tools)
     ? [...new Set(raw.tools.filter((id): id is ToolId => typeof id === 'string' && TOOL_IDS.has(id)))]
@@ -120,6 +127,13 @@ export function sanitizeProfile(input: unknown): WorkshopProfile {
       utilitiesRub: nonNegative(rates.utilitiesRub, DEFAULT_RATES.utilitiesRub, 1_000_000),
       overheadPct: nonNegative(rates.overheadPct, DEFAULT_RATES.overheadPct, 1000),
       targetMarginPct: nonNegative(rates.targetMarginPct, DEFAULT_RATES.targetMarginPct, 10_000),
+    },
+    norms: {
+      perStripMin: nonNegative(norms.perStripMin, DEFAULT_TIME_NORMS.perStripMin, 600),
+      perGlueUpMin: nonNegative(norms.perGlueUpMin, DEFAULT_TIME_NORMS.perGlueUpMin, 600),
+      perCrosscutMin: nonNegative(norms.perCrosscutMin, DEFAULT_TIME_NORMS.perCrosscutMin, 600),
+      perSquareDmMin: nonNegative(norms.perSquareDmMin, DEFAULT_TIME_NORMS.perSquareDmMin, 600),
+      finishingMin: nonNegative(norms.finishingMin, DEFAULT_TIME_NORMS.finishingMin, 6000),
     },
     stock: {
       lengthMm: positive(stock.lengthMm, DEFAULT_STOCK.lengthMm, 12_000),

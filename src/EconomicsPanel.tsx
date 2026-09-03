@@ -19,7 +19,12 @@ export function EconomicsPanel({ input }: Props) {
   const rates = profile.rates;
   const [open, setOpen] = useState(false);
 
-  const economics = useMemo(() => calculateEconomics(input, rates), [input, rates]);
+  // Нормативы тоже из профиля: журнал факта заменяет оценку на замеры
+  // мастерской, и панель обязана считать по ним, а не по умолчанию.
+  const economics = useMemo(
+    () => calculateEconomics(input, rates, profile.norms),
+    [input, rates, profile.norms]
+  );
 
   const patch = (changes: Partial<WorkshopRates>) =>
     patchProfile({ rates: { ...rates, ...changes } });

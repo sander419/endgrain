@@ -30,3 +30,4 @@ export * from './nesting';
 export * from './readiness';
 export * from './kb';
 export * from './registry';
+export * from './factlog';

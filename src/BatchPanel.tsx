@@ -43,10 +43,10 @@ export function BatchPanel({ input, pieces, kerfMm }: Props) {
       material.boardsIfSeparate > 0
         ? (input.materialCostRub * material.boards) / material.boardsIfSeparate
         : input.materialCostRub;
-    return calculateBatch(input, count, profile.rates, undefined, {
+    return calculateBatch(input, count, profile.rates, profile.norms, {
       materialPerBoardRub: perBoard,
     });
-  }, [input, count, profile.rates, material]);
+  }, [input, count, profile.rates, profile.norms, material]);
 
   return (
     <section className="batch dom-money">
