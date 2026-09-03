@@ -24,3 +24,4 @@ export * from './profile';
 export * from './stock';
 export * from './batch';
 export * from './order';
+export * from './facts';

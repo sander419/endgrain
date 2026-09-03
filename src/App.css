@@ -1132,6 +1132,7 @@ button.link:hover { background: none; color: var(--text); }
 
 /* Предпросмотр инструкции на экране (?print=1) — те же правила, что и на бумаге. */
 .app.show-print .topbar,
+.app.show-print .studio-tabs,
 .app.show-print .layout { display: none; }
 
 .app.show-print .print-sheet {
@@ -1189,7 +1190,9 @@ button.link:hover { background: none; color: var(--text); }
 
 @media print {
   body { background: #fff; color: #000; }
-  .topbar, .layout, .toast { display: none !important; }
+  /* .studio-tabs — вкладки студии мозаики: без них на лист уезжала полоса
+     «Стиль · Рисовать · Доска», которую никто не заказывал. */
+  .topbar, .studio-tabs, .layout, .toast { display: none !important; }
 
   .print-sheet {
     display: block;
@@ -1410,3 +1413,121 @@ button.link:hover { background: none; color: var(--text); }
 }
 
 .workshop-dialog h3:first-of-type { margin-top: 12px; }
+
+/* ── Заказы ────────────────────────────────────────── */
+
+.orders-dialog { width: min(820px, 100%); }
+
+.orders-dialog .order-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.orders-dialog .order-list > li {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #17120e;
+}
+
+/* Просроченный заказ виден с одного взгляда — за этим список и открывают. */
+.orders-dialog .order-list > li.overdue { border-left: 3px solid var(--bad); }
+
+.order-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.order-customer {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: #120e0b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.order-summary {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.order-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.order-fields label { display: block; }
+.order-fields span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.order-fields input {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: #120e0b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 7px;
+}
+
+.order-note {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: #120e0b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+
+.order-meta { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+.order-meta b { color: var(--text); }
+
+.order-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+@media (max-width: 640px) {
+  .order-fields { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Шапка документов клиенту ──────────────────────── */
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #bbb;
+}
+
+.sheet-logo { max-width: 90px; max-height: 60px; object-fit: contain; }
+.sheet-workshop { font-size: 15px; font-weight: 700; }
+.sheet-contact { font-size: 12px; color: #555; }
+
+@media print {
+  .sheet-head {
+    border-bottom: 1px solid #999;
+    margin-bottom: 10mm;
+  }
+  .sheet-logo { max-width: 28mm; max-height: 18mm; }
+  .sheet-workshop { font-size: 12pt; }
+  .sheet-contact { font-size: 9.5pt; color: #444; }
+
+  /* Паспорт кладут в коробку: список ухода не должен рваться между листами. */
+  .passport-sheet ul li { break-inside: avoid; }
+}

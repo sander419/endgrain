@@ -185,6 +185,29 @@ export function orderTotalRub(order: Order): number {
   return order.pricePerBoardRub * order.count;
 }
 
+/**
+ * Короткий код рецепта — четыре знака, которые можно продиктовать по телефону.
+ *
+ * Зачем он вместо ссылки. Board DNA в печатном виде бесполезна: это пятьсот
+ * с лишним символов, их никто не перепечатает. QR решал бы задачу, но своего
+ * генератора здесь нет, а тащить зависимость ради одной картинки в паспорте
+ * дороже, чем оно стоит: прод-зависимостей в проекте две, и это ценность.
+ * Код работает иначе и без сети: покупатель называет его мастерской, мастерская
+ * находит заказ у себя в архиве и повторяет доску точь-в-точь.
+ *
+ * Это не криптографический хеш и не должен им быть: он различает доски
+ * в архиве одной мастерской, а не во вселенной.
+ */
+export function recipeCode(dna: string): string {
+  if (!dna) return '';
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < dna.length; index += 1) {
+    hash ^= dna.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36).toUpperCase().padStart(4, '0').slice(-4);
+}
+
 /** Архив целиком одним файлом: перенос на другой компьютер и резервная копия. */
 export function exportOrders(orders: Order[]): string {
   return JSON.stringify({ kind: 'endgrain.orders', version: 1, orders }, null, 2);

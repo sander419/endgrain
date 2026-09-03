@@ -10,6 +10,8 @@ import {
   buildMosaicShareUrl,
   compileMosaic,
   emptyMosaic,
+  encodeMosaicDna,
+  factsFromMosaic,
   formatLength,
   generateMosaic,
   loadFavorites,
@@ -20,7 +22,9 @@ import {
   removeFavorite,
   resizeMosaic,
 } from './core';
+import { toBase64Url } from './core';
 import type {
+  BoardFacts,
   ControlKey,
   Favorite,
   GeneratorFamily,
@@ -166,9 +170,16 @@ const FAMILY_ORDER: GeneratorFamily[] = ['joinery', 'geometry', 'radial', 'gener
 interface Props {
   oil: number;
   onOilChange: (value: number) => void;
+  /**
+   * Куда студия кладёт свои факты и способ снять картинку. Через эту ссылку
+   * заказы и документы работают в мозаике, не зная о её внутреннем состоянии.
+   */
+  boardRef?: { current: { facts: BoardFacts; capture: () => string } | null };
+  /** Печатается документ клиенту — свой лист с инструкцией показывать нельзя. */
+  printingDocument?: boolean;
 }
 
-export function MosaicStudio({ oil, onOilChange }: Props) {
+export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: Props) {
   // ?stage=plan — прямая ссылка на этап, как ?gen= и ?print=.
   const [tab, setTab] = useState<Tab>(() => {
     const fromQuery = new URLSearchParams(window.location.search).get('stage');
@@ -515,15 +526,20 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     setMosaic((current) => paintCell(current, cell.row, cell.col, brush));
   };
 
+  /**
+   * Снимок рисунка. Фон — параметр: в интерфейсе доска лежит на тёмном, а
+   * в документе, который печатают и отдают клиенту, тёмная заливка на пол-листа
+   * это ведро краски и мятый лист.
+   */
   const renderThumbnail = useCallback(
-    (target: Mosaic, width = 220): string => {
+    (target: Mosaic, width = 220, background = '#14100d'): string => {
       const { rows, cols } = mosaicSize(target);
       const offscreen = document.createElement('canvas');
       offscreen.width = width;
       offscreen.height = Math.max(1, Math.round((width * rows) / Math.max(1, cols)));
       const ctx = offscreen.getContext('2d');
       if (!ctx) return '';
-      renderMosaic(ctx, target, { species: speciesMap, oil, background: '#14100d' });
+      renderMosaic(ctx, target, { species: speciesMap, oil, background });
       return offscreen.toDataURL('image/png');
     },
     [speciesMap, oil]
@@ -564,6 +580,21 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
     setBoardImage(renderThumbnail(mosaic, 1200));
     window.setTimeout(() => window.print(), 60);
   };
+
+  // Ссылка обновляется на каждый рендер, а не по списку зависимостей: она
+  // ничего не пересчитывает, а промахнуться списком тут значило бы отдать
+  // в документ клиенту вчерашнюю доску.
+  useEffect(() => {
+    if (!boardRef) return;
+    boardRef.current = {
+      facts: factsFromMosaic(
+        plan,
+        speciesMap,
+        toBase64Url(JSON.stringify(encodeMosaicDna(mosaic)))
+      ),
+      capture: () => renderThumbnail(mosaic, 1200, '#ffffff'),
+    };
+  });
 
   const dims = plan.finalDimensions;
   const paletteTooSmall = meta && palette.length < meta.minPalette;
@@ -1106,13 +1137,13 @@ export function MosaicStudio({ oil, onOilChange }: Props) {
 
       {toast && <div className="toast">{toast}</div>}
 
-      <MosaicPrintSheet
+      {!printingDocument && <MosaicPrintSheet
         plan={plan}
         species={speciesMap}
         cellMm={params.cellMm}
         kerfMm={sawKerfMm}
         boardImage={boardImage}
-      />
+      />}
     </>
   );
 }

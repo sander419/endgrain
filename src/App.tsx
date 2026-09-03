@@ -9,15 +9,30 @@ import {
   buildShareUrl,
   checkJoinery,
   defaultRecipe,
+  encodeBoardDna,
+  factsFromProjection,
   formatLength,
   getStepHint,
+  loadOrders,
   mulberry32,
+  orderUrl,
   plural,
   projectRecipe,
   randomizeWild,
   readDnaFromLocation,
+  saveOrders,
+  t,
+  todayIso,
 } from './core';
-import type { PresetId, ProcessStep, Recipe } from './core';
+import type { BoardFacts, Order, PresetId, ProcessStep, Recipe } from './core';
+
+/** Что печатаем: обычную инструкцию или документ клиенту по конкретному заказу. */
+type PrintJob = {
+  kind: 'offer' | 'passport';
+  order: Order;
+  facts: BoardFacts;
+  image: string | null;
+};
 import {
   duplicateStrip,
   flipSlice,
@@ -46,6 +61,9 @@ import { WorkshopPanel } from './WorkshopPanel';
 import { Icon } from './Icon';
 import { HelpDialog, markIntroSeen, shouldShowIntro } from './HelpDialog';
 import { WorkshopDialog, licenseStatusText } from './WorkshopDialog';
+import { OrdersDialog } from './OrdersDialog';
+import { OfferSheet } from './OfferSheet';
+import { PassportSheet } from './PassportSheet';
 import { useWorkshop } from './WorkshopContext';
 import type { IconName } from './Icon';
 import './App.css';
@@ -155,6 +173,13 @@ export default function App() {
   // инструмент как рисовалку и не доходит до производственной части.
   const [help, setHelp] = useState(() => shouldShowIntro(localStorage));
   const [workshopOpen, setWorkshopOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [orders, setOrders] = useState<Order[]>(loadOrders);
+  // Что печатаем сейчас. null — обычный лист с инструкцией.
+  const [printJob, setPrintJob] = useState<PrintJob | null>(null);
+  // Мозаика живёт своим состоянием: она кладёт сюда способ спросить
+  // её факты и снимок, чтобы документы работали в обоих режимах.
+  const mosaicBoard = useRef<{ facts: BoardFacts; capture: () => string } | null>(null);
   const { license, pro, profile } = useWorkshop();
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
@@ -522,6 +547,51 @@ export default function App() {
     window.setTimeout(() => window.print(), 60);
   };
 
+  const recipeDna = useMemo(() => encodeBoardDna({ v: 1, seed, recipe }), [recipe, seed]);
+  const recipeFacts = useMemo(
+    () => factsFromProjection(projection, recipe.species, recipeDna),
+    [projection, recipe.species, recipeDna]
+  );
+
+  /**
+   * Доска, открытая сейчас. В мозаике факты берутся из ссылки, которую студия
+   * обновляет на каждый свой рендер: диалог заказов открывается кликом, а клик
+   * перерисовывает и App — то есть читается всегда свежее.
+   */
+  const currentBoard = (): { facts: BoardFacts; capture: () => string | null } | null => {
+    if (mode === 'mosaic') return mosaicBoard.current;
+    return { facts: recipeFacts, capture: captureBoardImage };
+  };
+
+  const changeOrders = useCallback((next: Order[]) => setOrders(saveOrders(next)), []);
+
+  const printDocument = (kind: 'offer' | 'passport', order: Order) => {
+    const board = currentBoard();
+    if (!board) return;
+    setPrintJob({ kind, order, facts: board.facts, image: board.capture() });
+    setOrdersOpen(false);
+    // Тот же приём, что с инструкцией: дать React отрисовать лист до диалога.
+    window.setTimeout(() => window.print(), 80);
+  };
+
+  const openOrder = (order: Order) => {
+    const url = orderUrl(order, window.location.origin, window.location.pathname);
+    if (!url) return;
+    // Рецепт читается при старте, а смена одного хэша страницу не перезагружает,
+    // поэтому перезагрузку просим явно. Если replace увёл на другой адрес,
+    // до таймера дело уже не дойдёт.
+    window.location.replace(url);
+    window.setTimeout(() => window.location.reload(), 0);
+  };
+
+  // Печатный документ живёт только на время печати: иначе следующая печать
+  // инструкции вынесла бы на бумагу коммерческое предложение.
+  useEffect(() => {
+    const clear = () => setPrintJob(null);
+    window.addEventListener('afterprint', clear);
+    return () => window.removeEventListener('afterprint', clear);
+  }, []);
+
   const onExportPng = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -587,6 +657,14 @@ export default function App() {
           {profile.name || (pro && license.tier === 'workshop' ? license.workshop : 'Моя мастерская')}
         </button>
 
+        {pro && (
+          <button className="help-open" onClick={() => setOrdersOpen(true)}>
+            <Icon name="layers" size={13} />
+            {t('orders.title')}
+            {orders.length > 0 ? ` · ${orders.length}` : ''}
+          </button>
+        )}
+
         <div className="topbar-actions" hidden={mode !== 'recipe'}>
           <span className="undo-group">
             <button className="icon" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">↶</button>
@@ -599,7 +677,14 @@ export default function App() {
         </div>
       </header>
 
-      {mode === 'mosaic' && <MosaicStudio oil={oil} onOilChange={setOil} />}
+      {mode === 'mosaic' && (
+        <MosaicStudio
+          oil={oil}
+          onOilChange={setOil}
+          boardRef={mosaicBoard}
+          printingDocument={!!printJob}
+        />
+      )}
 
       <div className="studio-tabs" hidden={mode !== 'recipe'}>
         {RECIPE_STAGES.map((item, index) => (
@@ -998,15 +1083,46 @@ export default function App() {
 
       {workshopOpen && <WorkshopDialog onClose={() => setWorkshopOpen(false)} />}
 
+      {ordersOpen && (
+        <OrdersDialog
+          orders={orders}
+          onChange={changeOrders}
+          facts={currentBoard()?.facts ?? null}
+          onPrint={printDocument}
+          onOpen={openOrder}
+          onClose={() => setOrdersOpen(false)}
+        />
+      )}
+
       {toast && <div className="toast">{toast}</div>}
 
-      {mode === 'recipe' && <PrintSheet
+      {mode === 'recipe' && !printJob && <PrintSheet
         recipe={recipe}
         projection={projection}
         warnings={warnings}
         boardImage={boardImage}
         shareUrl={buildShareUrl(recipe, seed)}
       />}
+
+      {printJob?.kind === 'offer' && (
+        <OfferSheet
+          facts={printJob.facts}
+          order={printJob.order}
+          profile={profile}
+          licensedTo={license.tier === 'workshop' ? license.workshop : undefined}
+          boardImage={printJob.image}
+        />
+      )}
+
+      {printJob?.kind === 'passport' && (
+        <PassportSheet
+          facts={printJob.facts}
+          profile={profile}
+          licensedTo={license.tier === 'workshop' ? license.workshop : undefined}
+          madeAt={todayIso()}
+          boardImage={printJob.image}
+        />
+      )}
     </div>
   );
 }
