@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { calculateEconomics, formatDuration, loadProfile, patchProfile } from './core';
+import { calculateEconomics, formatDuration } from './core';
 import type { ProductionInput, WorkshopRates } from './core';
 import { Icon } from './Icon';
+import { useWorkshop } from './WorkshopContext';
 
 interface Props {
   input: ProductionInput;
@@ -12,18 +13,16 @@ interface Props {
  * изделия, основное съедает время, поэтому показываем и его тоже.
  */
 export function EconomicsPanel({ input }: Props) {
-  const [rates, setRates] = useState<WorkshopRates>(() => loadProfile().rates);
+  // Ставки живут в профиле, а не здесь: их же читают партия и печатный лист,
+  // и вторая копия состояния разъезжалась бы с первой.
+  const { profile, patch: patchProfile } = useWorkshop();
+  const rates = profile.rates;
   const [open, setOpen] = useState(false);
 
   const economics = useMemo(() => calculateEconomics(input, rates), [input, rates]);
 
-  const patch = (changes: Partial<WorkshopRates>) => {
-    setRates((current) => {
-      const next = { ...current, ...changes };
-      patchProfile({ rates: next });
-      return next;
-    });
-  };
+  const patch = (changes: Partial<WorkshopRates>) =>
+    patchProfile({ rates: { ...rates, ...changes } });
 
   const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 

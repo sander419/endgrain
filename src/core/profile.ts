@@ -16,6 +16,7 @@ import { DEFAULT_RATES, type WorkshopRates } from './economics';
 import { DEFAULT_STOCK } from './stock';
 import { DEFAULT_TOOLS, type ToolId, TOOLS } from './workshop';
 import type { StockBoard } from './nesting';
+import { sanitizeInventory, type InventoryBoard } from './inventory';
 
 export const PROFILE_STORAGE_KEY = 'endgrain.profile.v1';
 
@@ -36,7 +37,10 @@ export interface WorkshopProfile {
   logoDataUri: string;
   tools: ToolId[];
   rates: WorkshopRates;
+  /** Размер доски, которую мастерская покупает, когда своей не хватает. */
   stock: StockBoard;
+  /** Что уже лежит на складе. Пусто — считаем, что покупается всё. */
+  inventory: InventoryBoard[];
 }
 
 export const DEFAULT_PROFILE: WorkshopProfile = {
@@ -47,6 +51,7 @@ export const DEFAULT_PROFILE: WorkshopProfile = {
   tools: DEFAULT_TOOLS,
   rates: DEFAULT_RATES,
   stock: DEFAULT_STOCK,
+  inventory: [],
 };
 
 /**
@@ -120,6 +125,7 @@ export function sanitizeProfile(input: unknown): WorkshopProfile {
       lengthMm: positive(stock.lengthMm, DEFAULT_STOCK.lengthMm, 12_000),
       widthMm: positive(stock.widthMm, DEFAULT_STOCK.widthMm, 2000),
     },
+    inventory: sanitizeInventory(raw.inventory),
   };
 }
 

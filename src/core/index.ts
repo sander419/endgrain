@@ -25,3 +25,5 @@ export * from './stock';
 export * from './batch';
 export * from './order';
 export * from './facts';
+export * from './inventory';
+export * from './nesting';

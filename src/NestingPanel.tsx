@@ -2,12 +2,13 @@
  * Карта раскроя: что купить и как разложить бруски по доскам.
  * Схема рисуется в SVG — её можно распечатать и унести к станку.
  */
-import { useMemo, useState } from 'react';
-import { loadProfile, patchProfile } from './core';
+import { useMemo } from 'react';
 import type { WoodSpecies } from './core';
 import { STOCK_PRESETS, nestPieces } from './core/nesting';
 import type { NestPiece, StockBoard } from './core/nesting';
 import { Icon } from './Icon';
+import { useWorkshop } from './WorkshopContext';
+import { InventoryPanel } from './InventoryPanel';
 
 interface Props {
   pieces: NestPiece[];
@@ -16,11 +17,10 @@ interface Props {
 }
 
 export function NestingPanel({ pieces, kerfMm, species }: Props) {
-  const [stock, setStock] = useState(() => loadProfile().stock);
+  const { profile, patch, pro } = useWorkshop();
+  const stock = profile.stock;
 
-  const update = (patch: Partial<StockBoard>) => {
-    setStock((current) => patchProfile({ stock: { ...current, ...patch } }).stock);
-  };
+  const update = (changes: Partial<StockBoard>) => patch({ stock: { ...stock, ...changes } });
 
   const result = useMemo(() => nestPieces(pieces, stock, kerfMm), [pieces, stock, kerfMm]);
   const nameOf = (speciesId: string) => species[speciesId]?.name ?? speciesId;
@@ -130,6 +130,8 @@ export function NestingPanel({ pieces, kerfMm, species }: Props) {
           </div>
         </>
       )}
+
+      {pro && <InventoryPanel pieces={pieces} kerfMm={kerfMm} species={species} />}
     </section>
   );
 }

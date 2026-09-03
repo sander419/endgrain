@@ -69,6 +69,12 @@ export interface NestResult {
   bySpecies: SpeciesNest[];
   /** Детали, которые не влезают в покупную доску ни при какой раскладке. */
   unplaced: NestPiece[];
+  /**
+   * Детали, которым доска подошла бы, но досок больше не осталось.
+   * Отдельно от `unplaced`, потому что ответы разные: там «так не сделать»,
+   * а здесь «нужно ещё материала».
+   */
+  overflow: NestPiece[];
   kerfMm: number;
   stock: StockBoard;
   /** Полезный выход по всем доскам разом. */
@@ -92,12 +98,28 @@ interface BoardInWork {
 
 const EPS = 1e-6;
 
+export interface NestOptions {
+  /**
+   * Сколько досок разрешено занять **на каждую породу**. Раскладка и так идёт
+   * по породам отдельно — доска клёна не поможет деталям ореха.
+   *
+   * Без ограничения раскрой считает, что материала можно купить сколько угодно;
+   * с ограничением — что его ровно столько, и лишнее уходит в `overflow`.
+   */
+  maxBoards?: number;
+}
+
 export function nestPieces(
   pieces: NestPiece[],
   stock: StockBoard,
-  kerfMm: number
+  kerfMm: number,
+  options: NestOptions = {}
 ): NestResult {
   const kerf = Number.isFinite(kerfMm) && kerfMm > 0 ? kerfMm : 0;
+  const maxBoards =
+    Number.isFinite(options.maxBoards) && (options.maxBoards as number) >= 0
+      ? Math.floor(options.maxBoards as number)
+      : Number.POSITIVE_INFINITY;
   const stockLength = Math.max(0, stock.lengthMm);
   const stockWidth = Math.max(0, stock.widthMm);
 
@@ -116,6 +138,7 @@ export function nestPieces(
 
   const boards: NestedBoard[] = [];
   const summary: SpeciesNest[] = [];
+  const overflow: NestPiece[] = [];
 
   for (const [speciesId, list] of bySpecies) {
     // Сначала длинные и широкие: так полосы заполняются плотнее.
@@ -166,6 +189,12 @@ export function nestPieces(
         break;
       }
       if (placed) continue;
+
+      // Досок больше нет: деталь не «невозможна», ей просто не хватило материала.
+      if (inWork.length >= maxBoards) {
+        overflow.push(piece);
+        continue;
+      }
 
       // Новая доска.
       const board: NestedBoard = {
@@ -240,6 +269,7 @@ export function nestPieces(
     boards,
     bySpecies: summary.sort((a, b) => b.boards - a.boards),
     unplaced,
+    overflow,
     kerfMm: kerf,
     stock: { lengthMm: stockLength, widthMm: stockWidth },
     usedPct: totalStockArea > 0 ? (totalUsed / totalStockArea) * 100 : 0,

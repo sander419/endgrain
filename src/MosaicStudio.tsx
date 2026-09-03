@@ -44,6 +44,8 @@ import { imageToMosaic } from './render/imageMosaic';
 import { MosaicPrintSheet } from './MosaicPrintSheet';
 import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
+import { useWorkshop } from './WorkshopContext';
+import { BatchPanel } from './BatchPanel';
 import { WorkshopPanel } from './WorkshopPanel';
 import { useHistoryState } from './useHistoryState';
 import { Icon } from './Icon';
@@ -180,6 +182,7 @@ interface Props {
 }
 
 export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: Props) {
+  const { pro } = useWorkshop();
   // ?stage=plan — прямая ссылка на этап, как ?gen= и ?print=.
   const [tab, setTab] = useState<Tab>(() => {
     const fromQuery = new URLSearchParams(window.location.search).get('stage');
@@ -1117,6 +1120,21 @@ export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: P
                   materialCostRub: plan.totals.totalCost,
                 }}
               />
+
+              {pro && (
+                <BatchPanel
+                  input={{
+                    strips: plan.totals.stripsToPrepare,
+                    glueUps: plan.totals.glueUps,
+                    crosscuts: plan.totals.crosscuts,
+                    lengthMm: dims.topLengthMm,
+                    widthMm: dims.topWidthMm,
+                    materialCostRub: plan.totals.totalCost,
+                  }}
+                  pieces={stockPieces}
+                  kerfMm={sawKerfMm}
+                />
+              )}
 
               <MoisturePanel usage={moistureUsage} species={speciesMap} />
             </>

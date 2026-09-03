@@ -57,6 +57,7 @@ import { useHistoryState } from './useHistoryState';
 import { MosaicStudio } from './MosaicStudio';
 import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
+import { BatchPanel } from './BatchPanel';
 import { WorkshopPanel } from './WorkshopPanel';
 import { Icon } from './Icon';
 import { HelpDialog, markIntroSeen, shouldShowIntro } from './HelpDialog';
@@ -1040,6 +1041,21 @@ export default function App() {
                   materialCostRub: projection.totals.totalCost,
                 }}
               />
+
+              {pro && (
+                <BatchPanel
+                  input={{
+                    strips: recipe.panel.strips.length,
+                    glueUps: 1,
+                    crosscuts: cuts,
+                    lengthMm: dims.topLengthMm,
+                    widthMm: dims.topWidthMm,
+                    materialCostRub: projection.totals.totalCost,
+                  }}
+                  pieces={stockPieces}
+                  kerfMm={recipe.crosscut.sawKerfMm}
+                />
+              )}
 
               <MoisturePanel usage={moistureUsage} species={recipe.species} />
             </>
