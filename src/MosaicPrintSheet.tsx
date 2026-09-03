@@ -1,12 +1,11 @@
 import type { MosaicPlan, WoodSpecies } from './core';
 import { nestPieces } from './core/nesting';
-import { loadStock } from './core/stock';
 import {
   CLIMATE_PRESETS,
   analyseMovement,
   calculateEconomics,
   formatDuration,
-  loadWorkshopRates,
+  loadProfile,
   plural,
 } from './core';
 
@@ -40,7 +39,8 @@ export function MosaicPrintSheet({ plan, species, cellMm, kerfMm, boardImage }: 
   const piecesTotal = plan.materials.reduce((sum, material) => sum + material.pieces, 0);
 
   // Карта раскроя — по тому же размеру покупной доски, что выбран на экране.
-  const stock = loadStock();
+  const profile = loadProfile();
+  const stock = profile.stock;
   const nest = nestPieces(
     plan.panels.flatMap((panel) =>
       panel.order.map((speciesId, index) => ({
@@ -63,7 +63,7 @@ export function MosaicPrintSheet({ plan, species, cellMm, kerfMm, boardImage }: 
       widthMm: dims.topWidthMm,
       materialCostRub: plan.totals.totalCost,
     },
-    loadWorkshopRates()
+    profile.rates
   );
 
   const shopClimate = CLIMATE_PRESETS.find((p) => p.id === 'shop-winter')!.climate;

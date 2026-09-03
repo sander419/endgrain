@@ -1,45 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { DEFAULT_TOOLS, TOOLS, assessWorkshop } from './core';
+import { useMemo, useState } from 'react';
+import { TOOLS, assessWorkshop } from './core';
 import type { ToolId } from './core';
 import { Icon } from './Icon';
-
-const STORAGE_KEY = 'endgrain.workshop.v1';
-
-export function loadTools(): ToolId[] {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed as ToolId[];
-    }
-  } catch {
-    /* приватный режим или битые данные */
-  }
-  return DEFAULT_TOOLS;
-}
+import { useWorkshop } from './WorkshopContext';
 
 /**
  * «Что у меня есть» → «как это делать». Инструкция под чужой набор станков
  * бесполезна: половина шагов окажется невыполнимой, и человек бросит на первом.
  */
 export function WorkshopPanel() {
-  const [tools, setTools] = useState<ToolId[]>(loadTools);
+  const { profile, patch } = useWorkshop();
+  const tools = profile.tools;
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tools));
-    } catch {
-      /* приватный режим — набор не переживёт перезагрузку */
-    }
-  }, [tools]);
 
   const readiness = useMemo(() => assessWorkshop(tools), [tools]);
 
   const toggle = (id: ToolId) => {
-    setTools((current) =>
-      current.includes(id) ? current.filter((tool) => tool !== id) : [...current, id]
-    );
+    patch({
+      tools: tools.includes(id) ? tools.filter((tool) => tool !== id) : [...tools, id],
+    });
   };
 
   const slower = Math.round((readiness.timeMultiplier - 1) * 100);

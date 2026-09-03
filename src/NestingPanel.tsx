@@ -3,10 +3,10 @@
  * Схема рисуется в SVG — её можно распечатать и унести к станку.
  */
 import { useMemo, useState } from 'react';
+import { loadProfile, patchProfile } from './core';
 import type { WoodSpecies } from './core';
 import { STOCK_PRESETS, nestPieces } from './core/nesting';
 import type { NestPiece, StockBoard } from './core/nesting';
-import { loadStock, saveStock } from './core/stock';
 import { Icon } from './Icon';
 
 interface Props {
@@ -16,10 +16,10 @@ interface Props {
 }
 
 export function NestingPanel({ pieces, kerfMm, species }: Props) {
-  const [stock, setStock] = useState(loadStock);
+  const [stock, setStock] = useState(() => loadProfile().stock);
 
   const update = (patch: Partial<StockBoard>) => {
-    setStock((current) => saveStock({ ...current, ...patch }));
+    setStock((current) => patchProfile({ stock: { ...current, ...patch } }).stock);
   };
 
   const result = useMemo(() => nestPieces(pieces, stock, kerfMm), [pieces, stock, kerfMm]);

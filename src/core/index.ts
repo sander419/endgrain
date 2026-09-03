@@ -19,3 +19,6 @@ export * from './workshop';
 export * from './favorites';
 export * from './defaults';
 export * from './i18n';
+export * from './license';
+export * from './profile';
+export * from './stock';

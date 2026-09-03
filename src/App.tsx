@@ -45,6 +45,8 @@ import { EconomicsPanel } from './EconomicsPanel';
 import { WorkshopPanel } from './WorkshopPanel';
 import { Icon } from './Icon';
 import { HelpDialog, markIntroSeen, shouldShowIntro } from './HelpDialog';
+import { WorkshopDialog, licenseStatusText } from './WorkshopDialog';
+import { useWorkshop } from './WorkshopContext';
 import type { IconName } from './Icon';
 import './App.css';
 
@@ -152,6 +154,8 @@ export default function App() {
   // Шпаргалка открывается сама один раз: пришедший по ссылке иначе читает
   // инструмент как рисовалку и не доходит до производственной части.
   const [help, setHelp] = useState(() => shouldShowIntro(localStorage));
+  const [workshopOpen, setWorkshopOpen] = useState(false);
+  const { license, pro, profile } = useWorkshop();
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
   // Перетаскивание планки: откуда взяли, куда встанет, было ли движение.
@@ -574,6 +578,15 @@ export default function App() {
           <Icon name="shield" size={13} />Как пользоваться
         </button>
 
+        <button
+          className={`help-open workshop-chip${pro ? ' on' : ''}`}
+          onClick={() => setWorkshopOpen(true)}
+          title={licenseStatusText(license)}
+        >
+          <Icon name="wrench" size={13} />
+          {profile.name || (pro && license.tier === 'workshop' ? license.workshop : 'Моя мастерская')}
+        </button>
+
         <div className="topbar-actions" hidden={mode !== 'recipe'}>
           <span className="undo-group">
             <button className="icon" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">↶</button>
@@ -982,6 +995,8 @@ export default function App() {
           }}
         />
       )}
+
+      {workshopOpen && <WorkshopDialog onClose={() => setWorkshopOpen(false)} />}
 
       {toast && <div className="toast">{toast}</div>}
 

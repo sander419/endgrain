@@ -7,12 +7,10 @@ import {
   formatDuration,
   formatLength,
   getSliceStripIndices,
-  loadWorkshopRates,
+  loadProfile,
   plural,
 } from './core';
-import { loadTools } from './WorkshopPanel';
 import { nestPieces } from './core/nesting';
-import { loadStock } from './core/stock';
 
 interface Props {
   recipe: Recipe;
@@ -59,7 +57,8 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
   }
 
   // Карта раскроя считается по тому же размеру доски, что выбран на экране.
-  const stock = loadStock();
+  const profile = loadProfile();
+  const stock = profile.stock;
   const nest = nestPieces(
     projection.cutList.map((piece) => ({
       pieceId: piece.pieceId,
@@ -80,7 +79,7 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
       widthMm: dims.topWidthMm,
       materialCostRub: projection.totals.totalCost,
     },
-    loadWorkshopRates()
+    profile.rates
   );
 
   // Движение считаем между сборкой в зимней мастерской и худшими условиями
@@ -102,7 +101,7 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
 
   // Порядок работ переписан под набор станков, отмеченный в приложении:
   // инструкция под чужую мастерскую бесполезна.
-  const workshop = assessWorkshop(loadTools());
+  const workshop = assessWorkshop(profile.tools);
 
   return (
     <div className="print-sheet">

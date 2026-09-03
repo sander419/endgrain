@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { calculateEconomics, formatDuration, loadWorkshopRates, saveWorkshopRates } from './core';
+import { calculateEconomics, formatDuration, loadProfile, patchProfile } from './core';
 import type { ProductionInput, WorkshopRates } from './core';
 import { Icon } from './Icon';
 
@@ -12,7 +12,7 @@ interface Props {
  * изделия, основное съедает время, поэтому показываем и его тоже.
  */
 export function EconomicsPanel({ input }: Props) {
-  const [rates, setRates] = useState<WorkshopRates>(loadWorkshopRates);
+  const [rates, setRates] = useState<WorkshopRates>(() => loadProfile().rates);
   const [open, setOpen] = useState(false);
 
   const economics = useMemo(() => calculateEconomics(input, rates), [input, rates]);
@@ -20,7 +20,7 @@ export function EconomicsPanel({ input }: Props) {
   const patch = (changes: Partial<WorkshopRates>) => {
     setRates((current) => {
       const next = { ...current, ...changes };
-      saveWorkshopRates(next);
+      patchProfile({ rates: next });
       return next;
     });
   };
