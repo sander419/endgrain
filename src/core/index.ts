@@ -22,3 +22,5 @@ export * from './i18n';
 export * from './license';
 export * from './profile';
 export * from './stock';
+export * from './batch';
+export * from './order';
