@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkJoinery, defaultRecipe } from '../src/core';
+import { checkJoinery, checkMosaic, defaultRecipe } from '../src/core';
 import type { Recipe } from '../src/core';
 
 function withStrips(strips: Recipe['panel']['strips']): Recipe {
@@ -67,5 +67,53 @@ describe('checkJoinery', () => {
       { speciesId: 'cherry', widthMm: 40 },
     ]);
     expect(checkJoinery(recipe).map((w) => w.id)).toContain('shrinkage_conflict');
+  });
+});
+
+describe('столярный чек мозаики', () => {
+  const clean = {
+    glueUps: 3,
+    cols: 21,
+    cellMm: 25,
+    hasRepeatBlock: false,
+    paletteTooSmall: false,
+  };
+
+  it('нормальный рисунок замечаний не собирает', () => {
+    expect(checkMosaic(clean)).toEqual([]);
+  });
+
+  it('много щитов — замечание, но повторяющийся блок его снимает', () => {
+    const many = { ...clean, glueUps: 12 };
+    expect(checkMosaic(many).some((w) => w.id === 'many_panels')).toBe(true);
+    expect(checkMosaic({ ...many, hasRepeatBlock: true }).some((w) => w.id === 'many_panels')).toBe(
+      false
+    );
+  });
+
+  it('мелкая клетка и длинная склейка ловятся', () => {
+    const ids = checkMosaic({ ...clean, cellMm: 12, cols: 40 }).map((w) => w.id);
+    expect(ids).toContain('small_cell');
+    expect(ids).toContain('wide_glueup');
+  });
+
+  it('каждое замечание отвечает на все четыре вопроса', () => {
+    // Строка «клетка меньше 15 мм» не помогает: она не объясняет механизм
+    // и не говорит, что менять.
+    const warnings = checkMosaic({
+      glueUps: 12,
+      cols: 40,
+      cellMm: 10,
+      hasRepeatBlock: false,
+      paletteTooSmall: true,
+    });
+    expect(warnings).toHaveLength(4);
+    for (const warning of warnings) {
+      expect(warning.problem, warning.id).toBeTruthy();
+      expect(warning.why, warning.id).toBeTruthy();
+      expect(warning.consequence, warning.id).toBeTruthy();
+      expect(warning.fix, warning.id).toBeTruthy();
+      expect(warning.articleId, warning.id).toBeTruthy();
+    }
   });
 });

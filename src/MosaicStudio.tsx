@@ -7,7 +7,10 @@ import {
   SPECIES_CATALOG,
   addFavorite,
   analyseMosaic,
+  assessReadiness,
+  assessWorkshop,
   buildMosaicShareUrl,
+  checkMosaic,
   compileMosaic,
   emptyMosaic,
   encodeMosaicDna,
@@ -16,6 +19,7 @@ import {
   generateMosaic,
   loadFavorites,
   mosaicSize,
+  nestPieces,
   paintCell,
   plural,
   readMosaicDnaFromLocation,
@@ -24,6 +28,7 @@ import {
 } from './core';
 import { toBase64Url } from './core';
 import type {
+  ArticleId,
   BoardFacts,
   ControlKey,
   Favorite,
@@ -45,6 +50,7 @@ import { MosaicPrintSheet } from './MosaicPrintSheet';
 import { MoisturePanel } from './MoisturePanel';
 import { EconomicsPanel } from './EconomicsPanel';
 import { useWorkshop } from './WorkshopContext';
+import { ArticleDialog, EstMark, ReadinessBadge, WarningList } from './JoineryCheck';
 import { BatchPanel } from './BatchPanel';
 import { WorkshopPanel } from './WorkshopPanel';
 import { useHistoryState } from './useHistoryState';
@@ -177,12 +183,21 @@ interface Props {
    * заказы и документы работают в мозаике, не зная о её внутреннем состоянии.
    */
   boardRef?: { current: { facts: BoardFacts; capture: () => string } | null };
+  /**
+   * Куда студия кладёт свои вкладки и способ на них перейти — чтобы поиск
+   * по инструменту находил их наравне с этапами «Рецепта».
+   */
+  navRef?: { current: { tabs: { id: string; label: string; hint: string }[]; goTo: (id: string) => void } | null };
   /** Печатается документ клиенту — свой лист с инструкцией показывать нельзя. */
   printingDocument?: boolean;
 }
 
-export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: Props) {
-  const { pro } = useWorkshop();
+const PRICE_NOTE =
+  'Цена пород — рыночный ориентир, а не справочная величина: справочного значения у неё не существует. Правится в настройках.';
+
+export function MosaicStudio({ oil, onOilChange, boardRef, navRef, printingDocument }: Props) {
+  const { pro, profile } = useWorkshop();
+  const [article, setArticle] = useState<ArticleId | null>(null);
   // ?stage=plan — прямая ссылка на этап, как ?gen= и ?print=.
   const [tab, setTab] = useState<Tab>(() => {
     const fromQuery = new URLSearchParams(window.location.search).get('stage');
@@ -599,8 +614,46 @@ export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: P
     };
   });
 
+  useEffect(() => {
+    if (!navRef) return;
+    navRef.current = {
+      tabs: TABS.map((item) => ({ id: item.id, label: item.label, hint: item.hint })),
+      goTo: (id) => setTab(id as Tab),
+    };
+    return () => {
+      // Уходя из мозаики, студия убирает за собой: иначе поиск предлагал бы
+      // вкладки режима, которого на экране нет.
+      navRef.current = null;
+    };
+  }, [navRef]);
+
   const dims = plan.finalDimensions;
-  const paletteTooSmall = meta && palette.length < meta.minPalette;
+  const paletteTooSmall = meta ? palette.length < meta.minPalette : false;
+
+  const mosaicWarnings = useMemo(
+    () =>
+      checkMosaic({
+        glueUps: plan.totals.glueUps,
+        cols: plan.cols,
+        cellMm: params.cellMm,
+        hasRepeatBlock: !!analysis.block,
+        paletteTooSmall,
+      }),
+    [plan.totals.glueUps, plan.cols, params.cellMm, analysis.block, paletteTooSmall]
+  );
+
+  const readiness = useMemo(
+    () =>
+      assessReadiness({
+        valid: plan.valid,
+        issues: plan.issues,
+        warnings: mosaicWarnings,
+        workshop: assessWorkshop(profile.tools),
+        unplaced: nestPieces(stockPieces, profile.stock, sawKerfMm).unplaced,
+        species: palette.map((id) => speciesMap[id]).filter(Boolean),
+      }),
+    [plan.valid, plan.issues, mosaicWarnings, profile.tools, profile.stock, stockPieces, sawKerfMm, palette, speciesMap]
+  );
 
   const controlValue = (key: ControlKey): number => params[key];
 
@@ -985,7 +1038,7 @@ export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: P
                     <div><dt>Сырой объём</dt><dd>{plan.totals.rawVolumeM3.toFixed(5)} м³</dd></div>
                     <div><dt>В доске</dt><dd>{plan.totals.netVolumeM3.toFixed(5)} м³</dd></div>
                     <div className="accent"><dt>Отходы</dt><dd>{plan.totals.wastePct.toFixed(1)}%</dd></div>
-                    <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
+                    <div className="accent"><dt>Материал <EstMark note={PRICE_NOTE} /></dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
                   </dl>
                 </section>
               )}
@@ -1008,7 +1061,7 @@ export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: P
                 <div><dt>Толщина</dt><dd>{formatLength(dims.thicknessMm, 'mm')}</dd></div>
                 <div><dt>Щитов склеить</dt><dd>{plan.totals.glueUps}</dd></div>
                 <div className="accent"><dt>Отходы</dt><dd>{plan.totals.wastePct.toFixed(1)}%</dd></div>
-                <div className="accent"><dt>Материал</dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
+                <div className="accent"><dt>Материал <EstMark note={PRICE_NOTE} /></dt><dd>{Math.round(plan.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
               </dl>
               <p className="note-small">
                 Полный расчёт — на этапах «Производство» и «Экономика».
@@ -1087,21 +1140,8 @@ export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: P
 
               <section>
                 <h2><Icon name="shield" />Столярный чек</h2>
-                <ul className="warnings">
-                  {!plan.valid && plan.issues.map((issue) => <li key={issue}>{issue}</li>)}
-                  {plan.totals.glueUps > 8 && !analysis.block && (
-                    <li>
-                      {plan.totals.glueUps} щитов — это {plan.totals.glueUps} отдельных склеек.
-                      Симметричный или повторяющийся рисунок обойдётся дешевле.
-                    </li>
-                  )}
-                  {params.cellMm < 15 && <li>Клетка меньше 15 мм — бруски тонкие, склейка капризная.</li>}
-                  {plan.cols > 30 && <li>Больше 30 планок за одну склейку не стянуть: клей подгруппами.</li>}
-                  {paletteTooSmall && <li>Пород меньше, чем нужно стилю — узор выйдет бедным.</li>}
-                </ul>
-                {plan.valid && plan.totals.glueUps <= 8 && params.cellMm >= 15 && plan.cols <= 30 && !paletteTooSmall && (
-                  <p className="ok">Рисунок изготовим как есть.</p>
-                )}
+                <ReadinessBadge readiness={readiness} />
+                <WarningList warnings={mosaicWarnings} onArticle={setArticle} />
               </section>
             </>
           )}
@@ -1152,6 +1192,10 @@ export function MosaicStudio({ oil, onOilChange, boardRef, printingDocument }: P
           </section>
         </aside>
       </main>
+
+      {article && (
+        <ArticleDialog id={article} onOpen={setArticle} onClose={() => setArticle(null)} />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
 

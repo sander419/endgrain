@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { SPECIES_CATALOG, SPECIES_BY_ID } from '../src/core/defaults';
+import {
+  SPECIES_POLICY,
+  checkRegistry,
+  markOf,
+  missingFields,
+  policyFor,
+} from '../src/core/registry';
 
 /**
  * Контракт справочника пород. Держит правило из docs/DATA-SOURCES.md:
@@ -85,5 +92,54 @@ describe('справочник пород', () => {
   it('названия пород различаются: два «дуба» в палитре не выбрать', () => {
     const names = SPECIES_CATALOG.map((species) => species.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe('контракт данных', () => {
+  it('справочник контракт не нарушает', () => {
+    expect(checkRegistry()).toEqual([]);
+  });
+
+  it('запись без источника ловится', () => {
+    const broken = [{ ...SPECIES_CATALOG[0], source: undefined }];
+    expect(checkRegistry(broken).some((problem) => problem.includes('нет источника'))).toBe(true);
+  });
+
+  it('пропущенное обязательное поле названо человеческим именем', () => {
+    const broken = [{ ...SPECIES_CATALOG[0], densityKgM3: undefined }];
+    expect(checkRegistry(broken).some((problem) => problem.includes('Плотность'))).toBe(true);
+  });
+
+  it('цена помечена оценкой, а не справочным значением', () => {
+    // Справочного значения цены не существует: она зависит от поставщика,
+    // сорта и партии. Показывать её как факт нельзя ни из какого источника.
+    expect(policyFor('pricePerCubicMeter')?.mark).toBe('est');
+    expect(markOf(SPECIES_CATALOG[0], 'pricePerCubicMeter')).toBe('est');
+  });
+
+  it('плотность и усушка помечены источником', () => {
+    for (const field of ['densityKgM3', 'shrinkageTangentialPct'] as const) {
+      expect(markOf(SPECIES_CATALOG[0], field), field).toBe('source');
+    }
+  });
+
+  it('незаполненное поле — unknown, а не «оценка»', () => {
+    const bare = { id: 'x', name: 'Неизвестная', colorHex: '#888888' };
+    expect(markOf(bare, 'densityKgM3')).toBe('unknown');
+    expect(markOf(bare, 'pricePerCubicMeter')).toBe('unknown');
+    expect(missingFields(bare).length).toBeGreaterThan(0);
+  });
+
+  it('у полного справочника пропусков нет', () => {
+    for (const species of SPECIES_CATALOG) {
+      expect(missingFields(species), species.id).toEqual([]);
+    }
+  });
+
+  it('каждое поле политики объяснено: пометка без причины бесполезна', () => {
+    for (const policy of SPECIES_POLICY) {
+      expect(policy.note.trim(), policy.field).not.toBe('');
+      expect(policy.label.trim(), policy.field).not.toBe('');
+    }
   });
 });

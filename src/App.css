@@ -1597,3 +1597,135 @@ button.link:hover { background: none; color: var(--text); }
 @media (max-width: 900px) {
   .inventory-list > li { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Готовность доски и энциклопедия ───────────────── */
+
+.readiness {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: #1b1510;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.readiness b { display: block; margin-bottom: 4px; font-size: 13px; }
+.readiness > span { color: var(--muted); }
+
+.readiness-ok { border-left-color: var(--ok); }
+.readiness-ok b { color: var(--ok); }
+.readiness-caution { border-left-color: var(--warn); }
+.readiness-caution b { color: var(--warn); }
+.readiness-danger { border-left-color: var(--bad); }
+.readiness-danger b { color: var(--bad); }
+
+.readiness ul {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.readiness li { color: var(--text); }
+.readiness li em { color: var(--muted); font-style: normal; font-size: 11.5px; }
+.readiness li.reason-impossible { color: var(--bad); }
+
+.warn-article {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  font-size: 11.5px;
+}
+
+.article-dialog p { margin: 0 0 10px; line-height: 1.55; }
+.article-dialog .article-related { font-size: 12px; color: var(--muted); }
+.article-dialog a { color: var(--accent); word-break: break-all; }
+
+/* «Оценка» рядом с числом, у которого нет справочного значения. */
+.est-mark {
+  margin-left: 5px;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  cursor: help;
+  white-space: nowrap;
+}
+
+/* ── Поиск по инструменту (Ctrl+K) ─────────────────── */
+
+.palette-backdrop { align-items: flex-start; padding-top: 12vh; }
+
+.palette {
+  width: min(620px, 100%);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+.palette-input {
+  font: inherit;
+  font-size: 15px;
+  padding: 14px 16px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  outline: none;
+}
+
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.palette-list > li {
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.palette-list > li.on { background: #2a1f16; }
+.palette-list > li b { display: block; font-size: 13px; color: var(--text); }
+
+.palette-hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  /* Подсказка бывает длинной: обрезаем строкой, а не переносим на пять. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-group {
+  display: block;
+  margin: 6px 0 3px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.palette-empty { margin: 0; padding: 18px 16px; color: var(--muted); font-size: 13px; }
+
+.palette-keys {
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+}

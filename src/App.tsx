@@ -6,6 +6,9 @@ import {
   SPECIES_BY_ID,
   SPECIES_CATALOG,
   applyPreset,
+  ARTICLES,
+  assessReadiness,
+  assessWorkshop,
   buildShareUrl,
   checkJoinery,
   defaultRecipe,
@@ -15,6 +18,7 @@ import {
   getStepHint,
   loadOrders,
   mulberry32,
+  nestPieces,
   orderUrl,
   plural,
   projectRecipe,
@@ -24,7 +28,7 @@ import {
   t,
   todayIso,
 } from './core';
-import type { BoardFacts, Order, PresetId, ProcessStep, Recipe } from './core';
+import type { ArticleId, BoardFacts, Order, PresetId, ProcessStep, Recipe } from './core';
 
 /** Что печатаем: обычную инструкцию или документ клиенту по конкретному заказу. */
 type PrintJob = {
@@ -63,6 +67,9 @@ import { Icon } from './Icon';
 import { HelpDialog, markIntroSeen, shouldShowIntro } from './HelpDialog';
 import { WorkshopDialog, licenseStatusText } from './WorkshopDialog';
 import { OrdersDialog } from './OrdersDialog';
+import { ArticleDialog, EstMark, ReadinessBadge, WarningList } from './JoineryCheck';
+import { CommandPalette } from './CommandPalette';
+import type { Command } from './CommandPalette';
 import { OfferSheet } from './OfferSheet';
 import { PassportSheet } from './PassportSheet';
 import { useWorkshop } from './WorkshopContext';
@@ -162,6 +169,9 @@ const RECIPE_STAGE_BY_ID: Record<RecipeStage, RecipeStageMeta> = Object.fromEntr
   RECIPE_STAGES.map((item) => [item.id, item])
 ) as Record<RecipeStage, RecipeStageMeta>;
 
+const PRICE_NOTE =
+  'Цена пород — рыночный ориентир, а не справочная величина: справочного значения у неё не существует. Правится в настройках.';
+
 export default function App() {
   const initial = useMemo(loadInitialRecipe, []);
   const [recipe, setRecipe, history] = useHistoryState<Recipe>(initial.recipe);
@@ -178,9 +188,12 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>(loadOrders);
   // Что печатаем сейчас. null — обычный лист с инструкцией.
   const [printJob, setPrintJob] = useState<PrintJob | null>(null);
+  const [article, setArticle] = useState<ArticleId | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   // Мозаика живёт своим состоянием: она кладёт сюда способ спросить
   // её факты и снимок, чтобы документы работали в обоих режимах.
   const mosaicBoard = useRef<{ facts: BoardFacts; capture: () => string } | null>(null);
+  const mosaicNav = useRef<{ tabs: { id: string; label: string; hint: string }[]; goTo: (id: string) => void } | null>(null);
   const { license, pro, profile } = useWorkshop();
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
@@ -232,6 +245,21 @@ export default function App() {
     [projection.cutList]
   );
   const warnings = useMemo(() => checkJoinery(recipe), [recipe]);
+
+  const readiness = useMemo(
+    () =>
+      assessReadiness({
+        valid: projection.valid,
+        issues: projection.issues,
+        warnings,
+        workshop: assessWorkshop(profile.tools),
+        // Раскрой считается по тем же деталям, что и карта: вердикт обязан
+        // видеть ровно то, что видит панель.
+        unplaced: nestPieces(stockPieces, profile.stock, recipe.crosscut.sawKerfMm).unplaced,
+        species: Object.values(recipe.species),
+      }),
+    [projection, warnings, profile.tools, profile.stock, stockPieces, recipe.species, recipe.crosscut.sawKerfMm]
+  );
   const manualCount = manualSliceCount(recipe);
 
   /** Ширины по породам — вход для расчёта движения древесины. */
@@ -585,6 +613,85 @@ export default function App() {
     window.setTimeout(() => window.location.reload(), 0);
   };
 
+  /**
+   * Что умеет поиск. Собирается на каждый рендер и это осознанно: список
+   * зависит от режима, лицензии и того, смонтирована ли студия мозаики.
+   * Мемоизация здесь экономила бы микросекунды и стоила бы устаревшего списка.
+   */
+  const commands: Command[] = [
+    ...(mode === 'recipe'
+      ? RECIPE_STAGES.map((item) => ({
+          id: `stage-${item.id}`,
+          title: item.label,
+          hint: item.tip,
+          group: t('palette.group.tabs'),
+          run: () => {
+            setStage(item.id);
+            if (item.view) setStep(item.view);
+          },
+        }))
+      : (mosaicNav.current?.tabs ?? []).map((tab) => ({
+          id: `tab-${tab.id}`,
+          title: tab.label,
+          hint: tab.hint,
+          group: t('palette.group.tabs'),
+          run: () => mosaicNav.current?.goTo(tab.id),
+        }))),
+    {
+      id: 'mode',
+      title: mode === 'recipe' ? 'Перейти в «Мозаику»' : 'Перейти в «Рецепт»',
+      hint: mode === 'recipe'
+        ? 'Рисунок по клеткам: под каждую уникальную колонку свой щит'
+        : 'Классическая доска: один щит, распил, перестановка планок',
+      group: t('palette.group.actions'),
+      run: () => setMode(mode === 'recipe' ? 'mosaic' : 'recipe'),
+    },
+    {
+      id: 'workshop',
+      title: t('workshop.dialog.title'),
+      hint: 'Название, контакт, логотип, ключ лицензии',
+      group: t('palette.group.actions'),
+      run: () => setWorkshopOpen(true),
+    },
+    ...(pro
+      ? [
+          {
+            id: 'orders',
+            title: t('orders.title'),
+            hint: 'Клиент, срок, цена, коммерческое предложение и паспорт',
+            group: t('palette.group.actions'),
+            run: () => setOrdersOpen(true),
+          },
+        ]
+      : []),
+    {
+      id: 'help',
+      title: 'Как пользоваться',
+      hint: 'Шпаргалка по инструменту',
+      group: t('palette.group.actions'),
+      run: () => setHelp(true),
+    },
+    ...ARTICLES.map((item) => ({
+      id: `kb-${item.id}`,
+      title: item.title,
+      hint: item.body[0],
+      group: t('palette.group.kb'),
+      run: () => setArticle(item.id),
+    })),
+  ];
+
+  // Ctrl+K — и на маке тоже: Cmd там же, где Ctrl на остальных.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Печатный документ живёт только на время печати: иначе следующая печать
   // инструкции вынесла бы на бумагу коммерческое предложение.
   useEffect(() => {
@@ -683,6 +790,7 @@ export default function App() {
           oil={oil}
           onOilChange={setOil}
           boardRef={mosaicBoard}
+          navRef={mosaicNav}
           printingDocument={!!printJob}
         />
       )}
@@ -991,7 +1099,7 @@ export default function App() {
               <div><dt>На пропил</dt><dd>{Math.round(projection.waste.crosscutKerfM3 * 1e9).toLocaleString('ru-RU')} мм³</dd></div>
               <div><dt>На торцовку</dt><dd>{Math.round(projection.waste.endTrimM3 * 1e9).toLocaleString('ru-RU')} мм³</dd></div>
               <div className="accent"><dt>Отходы</dt><dd>{projection.totals.wastePct.toFixed(1)}%</dd></div>
-              <div className="accent"><dt>Материал</dt><dd>{Math.round(projection.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
+              <div className="accent"><dt>Материал <EstMark note={PRICE_NOTE} /></dt><dd>{Math.round(projection.totals.totalCost).toLocaleString('ru-RU')} ₽</dd></div>
             </dl>
           </section>
 
@@ -1063,27 +1171,8 @@ export default function App() {
 
           <section hidden={stage === 'money'}>
             <h2><Icon name="shield" />Столярный чек</h2>
-            {!projection.valid && (
-              <ul className="issues">
-                {projection.issues.map((issue) => <li key={issue}>{issue}</li>)}
-              </ul>
-            )}
-            {warnings.length > 0 && (
-              <ul className="warnings">
-                {warnings.map((w) => (
-                  <li key={w.id + w.problem} className={`warn warn-${w.severity}`}>
-                    <b>{w.problem}</b>
-                    <span><i>Почему:</i> {w.why}</span>
-                    <span><i>Чем грозит:</i> {w.consequence}</span>
-                    <span><i>Что сделать:</i> {w.fix}</span>
-                    {w.source && <em className="warn-source">{w.source}</em>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {projection.valid && warnings.length === 0 && (
-              <p className="ok">Рецепт изготовим как есть.</p>
-            )}
+            <ReadinessBadge readiness={readiness} />
+            <WarningList warnings={warnings} onArticle={setArticle} />
           </section>
         </aside>
       </main>
@@ -1095,6 +1184,14 @@ export default function App() {
             setHelp(false);
           }}
         />
+      )}
+
+      {paletteOpen && (
+        <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />
+      )}
+
+      {article && (
+        <ArticleDialog id={article} onOpen={setArticle} onClose={() => setArticle(null)} />
       )}
 
       {workshopOpen && <WorkshopDialog onClose={() => setWorkshopOpen(false)} />}

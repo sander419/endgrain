@@ -94,6 +94,31 @@ export const ru = {
   'orders.noWorkshopName': 'Документы клиенту пока не подписаны: задайте название мастерской в «Моей мастерской».',
   'unit.day': ['день', 'дня', 'дней'],
 
+  // Готовность доски
+  'readiness.title': 'Готовность доски',
+  'readiness.ready': 'Готово — можно пилить',
+  'readiness.warnings': 'Есть замечания',
+  'readiness.missingData': 'Не хватает данных',
+  'readiness.impossible': 'Так не собрать',
+  'readiness.ready.body': 'Модель сходится, набор станков закрывает все операции, справочные данные на месте.',
+  'readiness.counts': 'Невозможно: {impossible} · нет данных: {missingData} · замечаний: {warnings}',
+  'readiness.where': 'смотреть в «{where}»',
+
+  // Поиск по инструменту
+  'palette.title': 'Поиск по инструменту',
+  'palette.placeholder': 'Вкладка, действие или статья…',
+  'palette.empty': 'Ничего не нашлось',
+  'palette.keys': '↑ ↓ — выбор · Enter — открыть · Esc — закрыть',
+  'palette.group.tabs': 'Вкладки',
+  'palette.group.actions': 'Действия',
+  'palette.group.kb': 'Энциклопедия',
+
+  // Энциклопедия
+  'kb.why': 'почему так',
+  'kb.related': 'Читайте также',
+  'kb.source': 'Источник',
+  'kb.close': 'Закрыть',
+
   // Склад
   'stock.title': 'Что уже лежит на складе',
   'stock.lead': 'Карта раскроя отвечает, сколько купить. Со складом она отвечает, сколько докупить — это и есть разница в деньгах.',

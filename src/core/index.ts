@@ -27,3 +27,6 @@ export * from './order';
 export * from './facts';
 export * from './inventory';
 export * from './nesting';
+export * from './readiness';
+export * from './kb';
+export * from './registry';
