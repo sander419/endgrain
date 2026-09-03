@@ -18,3 +18,4 @@ export * from './economics';
 export * from './workshop';
 export * from './favorites';
 export * from './defaults';
+export * from './i18n';
