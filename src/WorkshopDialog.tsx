@@ -57,6 +57,9 @@ export function WorkshopDialog({ onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const setContact = (field: keyof typeof profile.contacts, value: string) =>
+    patch({ contacts: { ...profile.contacts, [field]: value } });
+
   const onApplyKey = async () => {
     const state = await applyLicenseKey(draftKey);
     setNote(licenseStatusText(state));
@@ -189,6 +192,16 @@ export function WorkshopDialog({ onClose }: Props) {
           />
         </label>
 
+        <label className="field">
+          <span>{t('workshop.field.about')}</span>
+          <input
+            type="text"
+            value={profile.about}
+            placeholder={t('workshop.field.aboutPlaceholder')}
+            onChange={(event) => patch({ about: event.target.value })}
+          />
+        </label>
+
         <div className="workshop-logo">
           {profile.logoDataUri ? (
             <img src={profile.logoDataUri} alt="" />
@@ -217,6 +230,46 @@ export function WorkshopDialog({ onClose }: Props) {
             event.target.value = '';
           }}
         />
+
+        <h3>{t('workshop.section.contacts')}</h3>
+        <p className="help-note">{t('workshop.contacts.hint')}</p>
+
+        <div className="workshop-contacts">
+          <label className="field">
+            <span>{t('workshop.field.phone')}</span>
+            <input
+              type="tel"
+              value={profile.contacts.phone}
+              placeholder={t('workshop.field.phonePlaceholder')}
+              onChange={(event) => setContact('phone', event.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>{t('workshop.field.telegram')}</span>
+            <input
+              type="text"
+              value={profile.contacts.telegram}
+              placeholder={t('workshop.field.telegramPlaceholder')}
+              onChange={(event) => setContact('telegram', event.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>{t('workshop.field.email')}</span>
+            <input
+              type="email"
+              value={profile.contacts.email}
+              onChange={(event) => setContact('email', event.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>{t('workshop.field.site')}</span>
+            <input
+              type="text"
+              value={profile.contacts.site}
+              onChange={(event) => setContact('site', event.target.value)}
+            />
+          </label>
+        </div>
 
         <h3>{t('workshop.section.transfer')}</h3>
         <p className="help-note">{t('workshop.tools.hint')}</p>

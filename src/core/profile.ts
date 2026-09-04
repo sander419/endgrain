@@ -17,6 +17,7 @@ import { DEFAULT_STOCK } from './stock';
 import { DEFAULT_TOOLS, type ToolId, TOOLS } from './workshop';
 import type { StockBoard } from './nesting';
 import { sanitizeInventory, type InventoryBoard } from './inventory';
+import type { ShowcaseContacts } from './showcaseHtml';
 
 export const PROFILE_STORAGE_KEY = 'endgrain.profile.v1';
 
@@ -33,6 +34,14 @@ export interface WorkshopProfile {
   name: string;
   /** Телефон, почта или ссылка — то, по чему клиент вернётся. */
   contact: string;
+  /**
+   * Разобранные контакты для витрины. Отдельно от `contact`, потому что
+   * из строки «звоните, я в телеге» ссылку не собрать, а кнопка «написать»
+   * в карточке товара — единственное, что превращает просмотр в разговор.
+   */
+  contacts: ShowcaseContacts;
+  /** Пара строк о мастерской для шапки витрины. */
+  about: string;
   /** Логотип как data URI. Пусто — документы обходятся названием. */
   logoDataUri: string;
   tools: ToolId[];
@@ -52,6 +61,8 @@ export const DEFAULT_PROFILE: WorkshopProfile = {
   version: 1,
   name: '',
   contact: '',
+  contacts: { phone: '', telegram: '', email: '', site: '' },
+  about: '',
   logoDataUri: '',
   tools: DEFAULT_TOOLS,
   rates: DEFAULT_RATES,
@@ -104,6 +115,7 @@ export function sanitizeProfile(input: unknown): WorkshopProfile {
   const rates = (raw.rates ?? {}) as Record<string, unknown>;
   const stock = (raw.stock ?? {}) as Record<string, unknown>;
   const norms = (raw.norms ?? {}) as Record<string, unknown>;
+  const contacts = (raw.contacts ?? {}) as Record<string, unknown>;
 
   const tools = Array.isArray(raw.tools)
     ? [...new Set(raw.tools.filter((id): id is ToolId => typeof id === 'string' && TOOL_IDS.has(id)))]
@@ -119,6 +131,13 @@ export function sanitizeProfile(input: unknown): WorkshopProfile {
     version: 1,
     name: text(raw.name, 120),
     contact: text(raw.contact, 200),
+    contacts: {
+      phone: text(contacts.phone, 40),
+      telegram: text(contacts.telegram, 64),
+      email: text(contacts.email, 120),
+      site: text(contacts.site, 200),
+    },
+    about: text(raw.about, 600),
     logoDataUri: logoOk ? logo : '',
     tools,
     rates: {

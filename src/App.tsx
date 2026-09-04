@@ -9,6 +9,7 @@ import {
   ARTICLES,
   assessReadiness,
   assessWorkshop,
+  calculateEconomics,
   buildShareUrl,
   checkJoinery,
   defaultRecipe,
@@ -68,6 +69,7 @@ import { Icon } from './Icon';
 import { HelpDialog, markIntroSeen, shouldShowIntro } from './HelpDialog';
 import { WorkshopDialog, licenseStatusText } from './WorkshopDialog';
 import { OrdersDialog } from './OrdersDialog';
+import { ShowcaseDialog } from './ShowcaseDialog';
 import { ArticleDialog, EstMark, ReadinessBadge, WarningList } from './JoineryCheck';
 import { CommandPalette } from './CommandPalette';
 import type { Command } from './CommandPalette';
@@ -186,6 +188,7 @@ export default function App() {
   const [help, setHelp] = useState(() => shouldShowIntro(localStorage));
   const [workshopOpen, setWorkshopOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [showcaseOpen, setShowcaseOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>(loadOrders);
   // Что печатаем сейчас. null — обычный лист с инструкцией.
   const [printJob, setPrintJob] = useState<PrintJob | null>(null);
@@ -193,7 +196,11 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Мозаика живёт своим состоянием: она кладёт сюда способ спросить
   // её факты и снимок, чтобы документы работали в обоих режимах.
-  const mosaicBoard = useRef<{ facts: BoardFacts; capture: () => string } | null>(null);
+  const mosaicBoard = useRef<{
+    facts: BoardFacts;
+    capture: () => string;
+    suggestedPriceRub: number;
+  } | null>(null);
   const mosaicNav = useRef<{ tabs: { id: string; label: string; hint: string }[]; goTo: (id: string) => void } | null>(null);
   const { license, pro, profile } = useWorkshop();
   const [boardImage, setBoardImage] = useState<string | null>(null);
@@ -588,9 +595,28 @@ export default function App() {
    * обновляет на каждый свой рендер: диалог заказов открывается кликом, а клик
    * перерисовывает и App — то есть читается всегда свежее.
    */
-  const currentBoard = (): { facts: BoardFacts; capture: () => string | null } | null => {
+  const currentBoard = (): {
+    facts: BoardFacts;
+    capture: () => string | null;
+    suggestedPriceRub: number;
+  } | null => {
     if (mode === 'mosaic') return mosaicBoard.current;
-    return { facts: recipeFacts, capture: captureBoardImage };
+    return {
+      facts: recipeFacts,
+      capture: captureBoardImage,
+      suggestedPriceRub: calculateEconomics(
+        {
+          strips: recipe.panel.strips.length,
+          glueUps: 1,
+          crosscuts: cuts,
+          lengthMm: dims.topLengthMm,
+          widthMm: dims.topWidthMm,
+          materialCostRub: projection.totals.totalCost,
+        },
+        profile.rates,
+        profile.norms
+      ).suggestedPriceRub,
+    };
   };
 
   const changeOrders = useCallback((next: Order[]) => setOrders(saveOrders(next)), []);
@@ -771,6 +797,13 @@ export default function App() {
             <Icon name="layers" size={13} />
             {t('orders.title')}
             {orders.length > 0 ? ` · ${orders.length}` : ''}
+          </button>
+        )}
+
+        {pro && (
+          <button className="help-open" onClick={() => setShowcaseOpen(true)}>
+            <Icon name="star" size={13} />
+            {t('showcase.title')}
           </button>
         )}
 
@@ -1210,6 +1243,14 @@ export default function App() {
       )}
 
       {workshopOpen && <WorkshopDialog onClose={() => setWorkshopOpen(false)} />}
+
+      {showcaseOpen && (
+        <ShowcaseDialog
+          board={currentBoard()}
+          suggestedPriceRub={currentBoard()?.suggestedPriceRub ?? 0}
+          onClose={() => setShowcaseOpen(false)}
+        />
+      )}
 
       {ordersOpen && (
         <OrdersDialog

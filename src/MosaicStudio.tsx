@@ -10,6 +10,7 @@ import {
   assessReadiness,
   assessWorkshop,
   buildMosaicShareUrl,
+  calculateEconomics,
   checkMosaic,
   compileMosaic,
   emptyMosaic,
@@ -183,7 +184,9 @@ interface Props {
    * Куда студия кладёт свои факты и способ снять картинку. Через эту ссылку
    * заказы и документы работают в мозаике, не зная о её внутреннем состоянии.
    */
-  boardRef?: { current: { facts: BoardFacts; capture: () => string } | null };
+  boardRef?: {
+    current: { facts: BoardFacts; capture: () => string; suggestedPriceRub: number } | null;
+  };
   /**
    * Куда студия кладёт свои вкладки и способ на них перейти — чтобы поиск
    * по инструменту находил их наравне с этапами «Рецепта».
@@ -612,6 +615,18 @@ export function MosaicStudio({ oil, onOilChange, boardRef, navRef, printingDocum
         toBase64Url(JSON.stringify(encodeMosaicDna(mosaic)))
       ),
       capture: () => renderThumbnail(mosaic, 1200, '#ffffff'),
+      suggestedPriceRub: calculateEconomics(
+        {
+          strips: plan.totals.stripsToPrepare,
+          glueUps: plan.totals.glueUps,
+          crosscuts: plan.totals.crosscuts,
+          lengthMm: dims.topLengthMm,
+          widthMm: dims.topWidthMm,
+          materialCostRub: plan.totals.totalCost,
+        },
+        profile.rates,
+        profile.norms
+      ).suggestedPriceRub,
     };
   });
 

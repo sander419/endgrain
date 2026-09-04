@@ -1776,3 +1776,82 @@ button.link:hover { background: none; color: var(--text); }
 @media (max-width: 900px) {
   .fact-form { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Витрина ───────────────────────────────────────── */
+
+.showcase-dialog { width: min(860px, 100%); }
+
+.showcase-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.showcase-list > li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #17120e;
+}
+
+/* Снятая с витрины карточка гаснет, но остаётся читаемой. */
+.showcase-list > li.off { opacity: 0.5; }
+
+.showcase-list img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 7px;
+  background: #120e0b;
+}
+
+.showcase-noimage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 90px;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+}
+
+.showcase-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.showcase-fields > input,
+.showcase-row input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #120e0b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.showcase-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.showcase-row label { display: block; }
+.showcase-row span { display: block; margin-bottom: 3px; font-size: 11px; color: var(--muted); }
+
+.showcase-meta { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+.showcase-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.showcase-actions .link { font-size: 11.5px; padding: 0; }
+
+.workshop-contacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .showcase-list > li { grid-template-columns: 1fr; }
+  .showcase-list img, .showcase-noimage { width: 100%; height: 120px; }
+  .workshop-contacts { grid-template-columns: 1fr; }
+}
