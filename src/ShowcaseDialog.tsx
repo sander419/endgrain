@@ -139,7 +139,14 @@ export function ShowcaseDialog({ board, suggestedPriceRub, onClose }: Props) {
   const preview = () => {
     const blob = new Blob([buildShowcaseHtml(page)], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener');
+    const tab = window.open(url, '_blank', 'noopener');
+    // Блокировщик всплывающих окон, встроенный браузер, мобильный —
+    // окно может не открыться, и молчащая кнопка читается как поломка.
+    if (!tab) {
+      URL.revokeObjectURL(url);
+      setNote(t('showcase.previewBlocked'));
+      return;
+    }
     // Ссылку не отзываем сразу: вкладка ещё не успела её прочитать.
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };

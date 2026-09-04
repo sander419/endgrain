@@ -18,6 +18,8 @@
  * номер рецепта. Ровно как печатная инструкция и коммерческое предложение.
  */
 
+import { readJson, writeJson } from './storage';
+
 export interface ShowcaseItem {
   id: string;
   /** Заголовок карточки. Пусто — подставится размер с породами. */
@@ -53,8 +55,19 @@ export const SHOWCASE_STORAGE_KEY = 'endgrain.showcase.v1';
  */
 export const MAX_SHOWCASE_ITEMS = 24;
 
-/** ~300 КБ бинарных данных на карточку. Сжатый снимок 560 px укладывается втрое меньше. */
-export const MAX_ITEM_IMAGE_CHARS = 400_000;
+/**
+ * Предел картинки в карточке. Снимок 560 px в JPEG весит 40–80 КБ, то есть
+ * около 100 тысяч символов data URI; 120 тысяч — запас. Прежние 400 тысяч
+ * позволяли двум десяткам карточек занять 9 МБ, вдвое больше всей квоты.
+ */
+export const MAX_ITEM_IMAGE_CHARS = 120_000;
+
+/**
+ * Сколько всего может весить витрина. Проверяется при загрузке чужого файла:
+ * список, который заведомо не сохранится, лучше обрезать сразу, чем принять
+ * и потерять при первой же перезагрузке.
+ */
+export const MAX_SHOWCASE_CHARS = 1_600_000;
 
 const IMAGE_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
@@ -123,15 +136,9 @@ export function itemTitle(item: ShowcaseItem): string {
 }
 
 export function loadShowcase(): ShowcaseItem[] {
-  try {
-    const saved = localStorage.getItem(SHOWCASE_STORAGE_KEY);
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, MAX_SHOWCASE_ITEMS).map(sanitizeShowcaseItem);
-  } catch {
-    return [];
-  }
+  const parsed = readJson(SHOWCASE_STORAGE_KEY);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, MAX_SHOWCASE_ITEMS).map(sanitizeShowcaseItem);
 }
 
 export interface SaveResult {
@@ -148,12 +155,23 @@ export interface SaveResult {
  */
 export function saveShowcase(items: ShowcaseItem[]): SaveResult {
   const clean = items.slice(0, MAX_SHOWCASE_ITEMS).map(sanitizeShowcaseItem);
-  try {
-    localStorage.setItem(SHOWCASE_STORAGE_KEY, JSON.stringify(clean));
-    return { items: clean, overflow: false };
-  } catch {
-    return { items: clean, overflow: true };
+  return { items: clean, overflow: !writeJson(SHOWCASE_STORAGE_KEY, clean) };
+}
+
+/**
+ * Обрезать список по весу: карточки берутся по порядку, пока помещаются.
+ * Порядок задаёт мастерская, поэтому отбрасываются последние, а не случайные.
+ */
+export function fitShowcase(items: ShowcaseItem[]): ShowcaseItem[] {
+  const kept: ShowcaseItem[] = [];
+  let total = 0;
+  for (const item of items) {
+    const weight = item.imageDataUri.length + 400;
+    if (total + weight > MAX_SHOWCASE_CHARS) break;
+    total += weight;
+    kept.push(item);
   }
+  return kept;
 }
 
 export function addShowcaseItem(items: ShowcaseItem[], item: ShowcaseItem): ShowcaseItem[] {
@@ -202,7 +220,7 @@ export function importShowcase(json: string): ShowcaseItem[] | null {
   try {
     const parsed = JSON.parse(json) as { kind?: string; items?: unknown };
     if (parsed?.kind !== 'endgrain.showcase' || !Array.isArray(parsed.items)) return null;
-    return parsed.items.slice(0, MAX_SHOWCASE_ITEMS).map(sanitizeShowcaseItem);
+    return fitShowcase(parsed.items.slice(0, MAX_SHOWCASE_ITEMS).map(sanitizeShowcaseItem));
   } catch {
     return null;
   }

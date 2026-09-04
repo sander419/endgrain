@@ -62,7 +62,8 @@ const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const LOGO_LIMIT_KB = Math.round(MAX_LOGO_CHARS / 1024);
 
 export function WorkshopDialog({ onClose }: Props) {
-  const { profile, patch, replace, license, licenseKey, applyLicenseKey } = useWorkshop();
+  const { profile, patch, replace, license, licenseKey, applyLicenseKey, storageFailed } =
+    useWorkshop();
   const [draftKey, setDraftKey] = useState(licenseKey);
   const [note, setNote] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -198,6 +199,8 @@ export function WorkshopDialog({ onClose }: Props) {
         </header>
 
         <p className="help-lead">{t('workshop.dialog.lead')}</p>
+
+        {storageFailed && <p className="advice movement-danger">{t('storage.full')}</p>}
 
         <h3>{t('license.section')}</h3>
         <p className={pro ? 'ok' : 'advice'}>

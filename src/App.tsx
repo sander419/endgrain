@@ -202,7 +202,7 @@ export default function App() {
     suggestedPriceRub: number;
   } | null>(null);
   const mosaicNav = useRef<{ tabs: { id: string; label: string; hint: string }[]; goTo: (id: string) => void } | null>(null);
-  const { license, pro, profile } = useWorkshop();
+  const { license, pro, profile, reportStorageFailure } = useWorkshop();
   const [boardImage, setBoardImage] = useState<string | null>(null);
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
   // Перетаскивание планки: откуда взяли, куда встанет, было ли движение.
@@ -619,7 +619,19 @@ export default function App() {
     };
   };
 
-  const changeOrders = useCallback((next: Order[]) => setOrders(saveOrders(next)), []);
+  const changeOrders = useCallback(
+    (next: Order[]) => {
+      const stored = saveOrders(next);
+      setOrders(stored.value);
+      // Заказ, которого не будет после перезагрузки, — потерянные деньги.
+      // Молчать об этом нельзя даже ради спокойного интерфейса.
+      if (!stored.saved) {
+        reportStorageFailure();
+        flash(t('storage.fullShort'));
+      }
+    },
+    [reportStorageFailure, flash]
+  );
 
   const printDocument = (kind: 'offer' | 'passport', order: Order) => {
     const board = currentBoard();
@@ -754,6 +766,13 @@ export default function App() {
   useEffect(() => {
     if (printPreview) setBoardImage(captureBoardImage());
   }, [printPreview, captureBoardImage]);
+
+  /**
+   * Доска для диалогов — один вызов на рендер вместо трёх.
+   * Мемоизировать нельзя: мозаика кладёт свои факты в ref, а `useMemo`
+   * держал бы вчерашнюю доску до следующей смены зависимостей.
+   */
+  const openBoard = ordersOpen || showcaseOpen ? currentBoard() : null;
 
   return (
     <div className={['app', printPreview ? 'show-print' : '', shotMode ? 'shot' : ''].filter(Boolean).join(' ')}>
@@ -1246,8 +1265,8 @@ export default function App() {
 
       {showcaseOpen && (
         <ShowcaseDialog
-          board={currentBoard()}
-          suggestedPriceRub={currentBoard()?.suggestedPriceRub ?? 0}
+          board={openBoard}
+          suggestedPriceRub={openBoard?.suggestedPriceRub ?? 0}
           onClose={() => setShowcaseOpen(false)}
         />
       )}
@@ -1256,7 +1275,7 @@ export default function App() {
         <OrdersDialog
           orders={orders}
           onChange={changeOrders}
-          facts={currentBoard()?.facts ?? null}
+          facts={openBoard?.facts ?? null}
           onPrint={printDocument}
           onOpen={openOrder}
           onClose={() => setOrdersOpen(false)}

@@ -133,7 +133,7 @@ describe('архив заказов', () => {
 
   it('архив не растёт бесконечно', () => {
     const many = Array.from({ length: MAX_ORDERS + 50 }, () => createOrder());
-    expect(saveOrders(many)).toHaveLength(MAX_ORDERS);
+    expect(saveOrders(many).value).toHaveLength(MAX_ORDERS);
   });
 });
 

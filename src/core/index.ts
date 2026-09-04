@@ -34,3 +34,4 @@ export * from './factlog';
 export * from './showcase';
 export * from './showcaseHtml';
 export * from './pricing';
+export * from './storage';

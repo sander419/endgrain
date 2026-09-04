@@ -80,7 +80,9 @@ export function buildShareUrl(recipe: Recipe, seed?: number): string {
 
 export function readDnaFromLocation(): BoardDna | null {
   if (typeof window === 'undefined') return null;
-  const match = window.location.hash.match(/dna=([^&]+)/);
+  // Якорь обязателен: без него `#mdna=…` от мозаики попадает под `dna=`,
+  // и рецепт пытается разобрать чужой формат.
+  const match = window.location.hash.match(/(?:^|[#&])dna=([^&]+)/);
   if (!match) return null;
   return decodeBoardDna(match[1]);
 }

@@ -36,7 +36,7 @@ interface Props {
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
 export function FactLogPanel({ input, facts }: Props) {
-  const { profile, patch } = useWorkshop();
+  const { profile, patch, reportStorageFailure } = useWorkshop();
   const [entries, setEntries] = useState<FactEntry[]>(loadFactLog);
   const [hours, setHours] = useState('');
   const [material, setMaterial] = useState('');
@@ -55,7 +55,11 @@ export function FactLogPanel({ input, facts }: Props) {
     [entries]
   );
 
-  const change = (next: FactEntry[]) => setEntries(saveFactLog(next));
+  const change = (next: FactEntry[]) => {
+    const stored = saveFactLog(next);
+    setEntries(stored.value);
+    if (!stored.saved) reportStorageFailure();
+  };
 
   const usingOwnNorms = useMemo(
     () =>

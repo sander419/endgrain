@@ -18,6 +18,7 @@ import { DEFAULT_TOOLS, type ToolId, TOOLS } from './workshop';
 import type { StockBoard } from './nesting';
 import { sanitizeInventory, type InventoryBoard } from './inventory';
 import type { ShowcaseContacts } from './showcaseHtml';
+import { readJson, writeJson, type Stored } from './storage';
 
 export const PROFILE_STORAGE_KEY = 'endgrain.profile.v1';
 
@@ -178,26 +179,17 @@ function readLegacy(): WorkshopProfile {
 }
 
 export function loadProfile(): WorkshopProfile {
-  try {
-    const saved = localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (saved) return sanitizeProfile(JSON.parse(saved));
-  } catch {
-    /* приватный режим или битый профиль — ниже подхватим старые ключи */
-  }
+  const parsed = readJson(PROFILE_STORAGE_KEY);
+  if (parsed !== undefined) return sanitizeProfile(parsed);
   return readLegacy();
 }
 
-export function saveProfile(profile: WorkshopProfile): WorkshopProfile {
-  const clean = sanitizeProfile(profile);
-  try {
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(clean));
-  } catch {
-    /* приватный режим или переполненное хранилище: работать не мешает */
-  }
-  return clean;
+export function saveProfile(profile: WorkshopProfile): Stored<WorkshopProfile> {
+  const value = sanitizeProfile(profile);
+  return { value, saved: writeJson(PROFILE_STORAGE_KEY, value) };
 }
 
-export function patchProfile(patch: Partial<WorkshopProfile>): WorkshopProfile {
+export function patchProfile(patch: Partial<WorkshopProfile>): Stored<WorkshopProfile> {
   return saveProfile({ ...loadProfile(), ...patch });
 }
 

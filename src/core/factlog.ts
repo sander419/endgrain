@@ -19,6 +19,7 @@
  * модель данных и запись сделать сразу, экран со списком и фильтром отложить.
  */
 import { DEFAULT_TIME_NORMS, type TimeNorms } from './economics';
+import { readJson, writeJson, type Stored } from './storage';
 
 export interface FactEntry {
   id: string;
@@ -96,25 +97,14 @@ export function createFactEntry(patch: Partial<FactEntry> = {}): FactEntry {
 }
 
 export function loadFactLog(): FactEntry[] {
-  try {
-    const saved = localStorage.getItem(FACTLOG_STORAGE_KEY);
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, MAX_FACT_ENTRIES).map(sanitizeFactEntry);
-  } catch {
-    return [];
-  }
+  const parsed = readJson(FACTLOG_STORAGE_KEY);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, MAX_FACT_ENTRIES).map(sanitizeFactEntry);
 }
 
-export function saveFactLog(entries: FactEntry[]): FactEntry[] {
-  const clean = entries.slice(0, MAX_FACT_ENTRIES).map(sanitizeFactEntry);
-  try {
-    localStorage.setItem(FACTLOG_STORAGE_KEY, JSON.stringify(clean));
-  } catch {
-    /* приватный режим или переполненное хранилище */
-  }
-  return clean;
+export function saveFactLog(entries: FactEntry[]): Stored<FactEntry[]> {
+  const value = entries.slice(0, MAX_FACT_ENTRIES).map(sanitizeFactEntry);
+  return { value, saved: writeJson(FACTLOG_STORAGE_KEY, value) };
 }
 
 export function addFactEntry(entries: FactEntry[], entry: FactEntry): FactEntry[] {
@@ -153,6 +143,10 @@ export function summariseFactLog(
   norms: TimeNorms = DEFAULT_TIME_NORMS
 ): FactSummary {
   let boards = 0;
+  // Доски, которые реально участвуют в множителе. Считать уверенность
+  // по всем записям было бы обманом: пять досок без плана и одна с планом
+  // дали бы «норматив», выведенный из одного замера.
+  let measuredBoards = 0;
   let plannedMin = 0;
   let actualMin = 0;
   let plannedMaterialRub = 0;
@@ -163,6 +157,7 @@ export function summariseFactLog(
     if (entry.plannedMin > 0 && entry.actualMin > 0) {
       plannedMin += entry.plannedMin;
       actualMin += entry.actualMin;
+      measuredBoards += entry.count;
     }
     if (entry.plannedMaterialRub > 0 && entry.actualMaterialRub > 0) {
       plannedMaterialRub += entry.plannedMaterialRub;
@@ -183,7 +178,7 @@ export function summariseFactLog(
     timeRatio,
     materialRatio,
     suggested: calibrateNorms(norms, timeRatio),
-    confident: boards >= CONFIDENT_BOARDS && plannedMin > 0,
+    confident: measuredBoards >= CONFIDENT_BOARDS,
   };
 }
 

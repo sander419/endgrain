@@ -35,6 +35,10 @@ interface WorkshopValue {
   applyLicenseKey: (key: string) => Promise<LicenseState>;
   /** Открыт ли платный слой. Одно место, где это решается. */
   pro: boolean;
+  /** Хранилище отказало хотя бы раз за сессию. */
+  storageFailed: boolean;
+  /** Сообщить об отказе записи из другого места — заказов, журнала факта. */
+  reportStorageFailure: () => void;
 }
 
 const WorkshopContext = createContext<WorkshopValue | null>(null);
@@ -60,12 +64,27 @@ export function WorkshopProvider({ children }: { children: ReactNode }) {
     };
   }, [licenseKey]);
 
+  /**
+   * Запись могла не пройти: приватный режим, отключённое хранилище,
+   * переполнение. Флаг поднимается один раз и живёт до перезагрузки —
+   * молчать об этом нельзя, иначе мастерская теряет настройки незаметно.
+   */
+  const [storageFailed, setStorageFailed] = useState(false);
+
+  const reportStorageFailure = useCallback(() => setStorageFailed(true), []);
+
   const patch = useCallback((changes: Partial<WorkshopProfile>) => {
-    setProfile((current) => saveProfile({ ...current, ...changes }));
+    setProfile((current) => {
+      const stored = saveProfile({ ...current, ...changes });
+      if (!stored.saved) setStorageFailed(true);
+      return stored.value;
+    });
   }, []);
 
   const replace = useCallback((next: WorkshopProfile) => {
-    setProfile(saveProfile(next));
+    const stored = saveProfile(next);
+    if (!stored.saved) setStorageFailed(true);
+    setProfile(stored.value);
   }, []);
 
   const applyLicenseKey = useCallback(async (key: string) => {
@@ -87,8 +106,10 @@ export function WorkshopProvider({ children }: { children: ReactNode }) {
       licenseKey,
       applyLicenseKey,
       pro: isPro(license),
+      storageFailed,
+      reportStorageFailure,
     }),
-    [profile, patch, replace, license, licenseKey, applyLicenseKey]
+    [profile, patch, replace, license, licenseKey, applyLicenseKey, storageFailed, reportStorageFailure]
   );
 
   return <WorkshopContext.Provider value={value}>{children}</WorkshopContext.Provider>;

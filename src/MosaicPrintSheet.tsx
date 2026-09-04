@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { MosaicPlan, WoodSpecies } from './core';
 import { nestPieces } from './core/nesting';
 import {
@@ -41,7 +42,8 @@ export function MosaicPrintSheet({ plan, species, cellMm, kerfMm, boardImage }: 
   // Карта раскроя — по тому же размеру покупной доски, что выбран на экране.
   const profile = loadProfile();
   const stock = profile.stock;
-  const nest = nestPieces(
+  // То же, что в PrintSheet: лист висит в DOM всегда.
+  const nest = useMemo(() => nestPieces(
     plan.panels.flatMap((panel) =>
       panel.order.map((speciesId, index) => ({
         pieceId: `p${panel.index}-${index}`,
@@ -52,7 +54,7 @@ export function MosaicPrintSheet({ plan, species, cellMm, kerfMm, boardImage }: 
     ),
     stock,
     kerfMm
-  );
+  ), [plan.panels, cellMm, stock, kerfMm]);
 
   const economics = calculateEconomics(
     {

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { Recipe, RecipeProjection, JoineryWarning } from './core';
 import {
   CLIMATE_PRESETS,
@@ -59,7 +60,9 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
   // Карта раскроя считается по тому же размеру доски, что выбран на экране.
   const profile = loadProfile();
   const stock = profile.stock;
-  const nest = nestPieces(
+  // Лист смонтирован всегда и просто скрыт стилями, поэтому раскрой без
+  // мемоизации пересчитывался на каждый чужой рендер — тост, наведение, диалог.
+  const nest = useMemo(() => nestPieces(
     projection.cutList.map((piece) => ({
       pieceId: piece.pieceId,
       speciesId: piece.speciesId,
@@ -68,7 +71,7 @@ export function PrintSheet({ recipe, projection, warnings, boardImage, shareUrl 
     })),
     stock,
     recipe.crosscut.sawKerfMm
-  );
+  ), [projection.cutList, stock, recipe.crosscut.sawKerfMm]);
 
   const economics = calculateEconomics(
     {

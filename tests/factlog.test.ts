@@ -72,7 +72,7 @@ describe('журнал', () => {
 
   it('журнал не растёт бесконечно', () => {
     const many = Array.from({ length: MAX_FACT_ENTRIES + 20 }, () => createFactEntry());
-    expect(saveFactLog(many)).toHaveLength(MAX_FACT_ENTRIES);
+    expect(saveFactLog(many).value).toHaveLength(MAX_FACT_ENTRIES);
   });
 
   it('отрицательное время обнуляется, а не уходит в минус', () => {
@@ -167,5 +167,32 @@ describe('файл журнала', () => {
     expect(importFactLog('{"kind":"endgrain.orders","entries":[]}')).toBeNull();
     expect(importFactLog('[]')).toBeNull();
     expect(importFactLog('не json')).toBeNull();
+  });
+});
+
+describe('уверенность считается по замеренным доскам', () => {
+  it('записи без плана не делают множитель нормативом', () => {
+    // Пять досок без плана и одна с планом дали бы «норматив», выведенный
+    // из одного замера. Считаем только те доски, что участвуют в отношении.
+    const summary = summariseFactLog([
+      createFactEntry({ count: 5, plannedMin: 0, actualMin: 0 }),
+      createFactEntry({ count: 1, plannedMin: 100, actualMin: 150 }),
+    ]);
+    expect(summary.boards).toBe(6);
+    expect(summary.confident).toBe(false);
+  });
+
+  it('пять замеренных досок дают норматив', () => {
+    const summary = summariseFactLog([
+      createFactEntry({ count: 5, plannedMin: 500, actualMin: 700 }),
+    ]);
+    expect(summary.confident).toBe(true);
+    expect(summary.timeRatio).toBeCloseTo(1.4, 6);
+  });
+
+  it('пустой журнал ничего не утверждает', () => {
+    const summary = summariseFactLog([]);
+    expect(summary.confident).toBe(false);
+    expect(summary.timeRatio).toBe(1);
   });
 });

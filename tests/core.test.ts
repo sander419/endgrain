@@ -78,3 +78,14 @@ describe('transform matrix', () => {
     expect(matrix[1]).toEqual(['walnut', 'maple', 'walnut', 'maple']);
   });
 });
+
+describe('ссылка из хэша', () => {
+  it('«dna=» не подхватывает «mdna=» от мозаики', () => {
+    // Без якоря `#mdna=…` попадал под /dna=([^&]+)/, и рецепт пытался
+    // разобрать чужой формат.
+    const anchored = /(?:^|[#&])dna=([^&]+)/;
+    expect(anchored.test('#mdna=ABC')).toBe(false);
+    expect(anchored.exec('#dna=ABC')?.[1]).toBe('ABC');
+    expect(anchored.exec('#step=final&dna=ABC')?.[1]).toBe('ABC');
+  });
+});

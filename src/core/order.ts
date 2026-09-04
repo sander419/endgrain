@@ -11,6 +11,7 @@
  * свою же строку, прошлогодний заказ откроется.
  */
 import { fromBase64Url } from './share';
+import { readJson, writeJson, type Stored } from './storage';
 
 export type OrderStatus = 'draft' | 'quoted' | 'accepted' | 'inWork' | 'done' | 'cancelled';
 
@@ -53,8 +54,12 @@ export const ORDERS_STORAGE_KEY = 'endgrain.orders.v1';
 
 /** Больше двухсот заказов в localStorage держать незачем — это не база. */
 export const MAX_ORDERS = 200;
-/** Мозаика 21×21 в ДНК укладывается на порядок меньше. */
-export const MAX_DNA_CHARS = 32 * 1024;
+/**
+ * Предел ДНК в заказе. Мозаика 60×60 — самое большое, что умеет инструмент, —
+ * кодируется примерно в 5 КБ, поэтому 8 КБ это запас вдвое. Прежние 32 КБ
+ * позволяли двумстам заказам занять 6 МБ, то есть заведомо больше квоты.
+ */
+export const MAX_DNA_CHARS = 8 * 1024;
 
 export function newOrderId(): string {
   try {
@@ -116,26 +121,18 @@ export function createOrder(patch: Partial<Order> = {}): Order {
 }
 
 export function loadOrders(): Order[] {
-  try {
-    const saved = localStorage.getItem(ORDERS_STORAGE_KEY);
-    if (!saved) return [];
-    const parsed = JSON.parse(saved);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, MAX_ORDERS).map(sanitizeOrder);
-  } catch {
-    /* приватный режим или битый архив */
-  }
-  return [];
+  const parsed = readJson(ORDERS_STORAGE_KEY);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, MAX_ORDERS).map(sanitizeOrder);
 }
 
-export function saveOrders(orders: Order[]): Order[] {
-  const clean = orders.slice(0, MAX_ORDERS).map(sanitizeOrder);
-  try {
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(clean));
-  } catch {
-    /* хранилище переполнено или приватный режим: заказ останется в этой сессии */
-  }
-  return clean;
+/**
+ * Возвращает и список, и признак записи. Молча проглотить отказ здесь нельзя:
+ * заказ, которого не будет после перезагрузки, — потерянные деньги мастерской.
+ */
+export function saveOrders(orders: Order[]): Stored<Order[]> {
+  const value = orders.slice(0, MAX_ORDERS).map(sanitizeOrder);
+  return { value, saved: writeJson(ORDERS_STORAGE_KEY, value) };
 }
 
 /** Новый заказ встаёт первым: список читают сверху. */

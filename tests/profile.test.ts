@@ -175,7 +175,7 @@ describe('файл профиля', () => {
       contact: 'hiborg@example.com',
       tools: ['tablesaw', 'clamps'],
       rates: { ...DEFAULT_RATES, hourlyRateRub: 900 },
-    });
+    }).value;
     expect(importProfile(exportProfile(profile))).toEqual(profile);
   });
 
