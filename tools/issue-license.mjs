@@ -9,6 +9,7 @@
  *
  * Зависимостей нет: node:crypto умеет WebCrypto с 16-й версии.
  *
+ *   node tools/issue-license.mjs --ask        ← вопросы вместо флагов
  *   node tools/issue-license.mjs keygen
  *   node tools/issue-license.mjs --workshop "Хиборг" --trial
  *   node tools/issue-license.mjs --workshop "Хиборг" --months 12
@@ -20,7 +21,10 @@
  * отправить чужой ключ не тому.
  */
 import { webcrypto } from 'node:crypto';
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline/promises';
+import { readFile, writeFile, access, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -176,9 +180,20 @@ async function issue(args) {
   console.log(`Действует:  ${payload.e ?? 'бессрочно'}`);
   console.log(`Длина:      ${key.length} символов`);
   console.log('');
+  const text = message(workshop, key, payload, trial, trialDays);
   console.log('─── сообщение покупателю ───────────────────────────────');
-  console.log(message(workshop, key, payload, trial, trialDays));
+  console.log(text);
   console.log('────────────────────────────────────────────────────────');
+
+  if (args.copy) {
+    const copied = await copyToClipboard(text);
+    console.log('');
+    console.log(
+      copied
+        ? 'Сообщение скопировано в буфер обмена — вставляйте в переписку.'
+        : 'Скопировать в буфер не вышло: выделите текст выше мышью.'
+    );
+  }
 }
 
 /** Готовый текст: скопировать и отправить. */
@@ -259,7 +274,101 @@ async function check(key) {
   console.log(`Действует:  ${payload.e ?? 'бессрочно'}`);
 }
 
+/**
+ * Положить текст в буфер обмена Windows.
+ *
+ * Через PowerShell, а не через `clip.exe`: clip определяет Unicode только
+ * по метке порядка байт, и эта метка потом остаётся первым символом
+ * вставленного текста — невидимой, но настоящей. Сообщение клиенту,
+ * начинающееся с невидимого символа, — мелочь ровно до первого раза,
+ * когда она где-нибудь вылезет.
+ *
+ * Текст едет через временный файл: передавать его аргументом командной
+ * строки нельзя — кавычки и переводы строк в нём есть всегда.
+ */
+async function copyToClipboard(text) {
+  if (process.platform !== 'win32') return false;
+  const file = join(tmpdir(), `endgrain-key-${process.pid}.txt`);
+  try {
+    await writeFile(file, text, 'utf8');
+    const done = await new Promise((resolve) => {
+      const ps = spawn('powershell', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Set-Clipboard -Value (Get-Content -Raw -Encoding UTF8 -LiteralPath '${file}')`,
+      ]);
+      ps.on('error', () => resolve(false));
+      ps.on('close', (code) => resolve(code === 0));
+    });
+    return done;
+  } catch {
+    return false;
+  } finally {
+    // Ключ не секрет от того, кто его выпустил, но и валяться во временной
+    // папке ему незачем.
+    await rm(file, { force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Ответы на вопросы.
+ *
+ * В терминале — обычный диалог. Когда ввод не терминал (скрипт, конвейер),
+ * весь он читается сразу и раздаётся по строкам: `readline` на закрытом
+ * потоке гонится с событием `close`, и ответ, который уже есть, теряется.
+ * Гонку проще убрать, чем выиграть, — заодно инструмент становится
+ * пригодным для скриптов.
+ */
+async function answers(prompts) {
+  if (!process.stdin.isTTY) {
+    let input = '';
+    for await (const chunk of process.stdin) input += chunk;
+    const lines = input.split(/\r?\n/);
+    prompts.forEach((prompt, index) => console.log(prompt + (lines[index] ?? '')));
+    return prompts.map((_, index) => lines[index] ?? '');
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const given = [];
+    for (const prompt of prompts) given.push(await rl.question(prompt));
+    return given;
+  } finally {
+    rl.close();
+  }
+}
+
+async function ask() {
+  console.log('Кому выдаём ключ?');
+  console.log('');
+  console.log('  1 — проба на 14 дней');
+  console.log('  2 — ключ на год');
+  console.log('  3 — бессрочный ключ');
+  console.log('');
+
+  const [rawName, rawChoice] = await answers(['Название мастерской: ', 'Что выдаём? [1]: ']);
+  const workshop = rawName.trim();
+
+  if (!workshop) {
+    console.error('');
+    console.error('Пусто — ключ не выпущен. Название подписывается вместе с ключом.');
+    process.exitCode = 1;
+    return null;
+  }
+
+  const choice = rawChoice.trim() || '1';
+  console.log('');
+
+  if (choice === '2') return { workshop, months: '12' };
+  if (choice === '3') return { workshop, perpetual: true };
+  return { workshop, trial: true };
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (args._[0] === 'keygen') await keygen();
 else if (args.check) await check(args.check);
-else await issue(args);
+else if (args.ask) {
+  const answers = await ask();
+  if (answers) await issue({ ...answers, _: [], copy: true });
+} else await issue(args);
