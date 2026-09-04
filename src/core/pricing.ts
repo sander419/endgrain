@@ -27,7 +27,7 @@ export const PRICING: Pricing = {
   yearRub: 4900,
   foreverRub: 12900,
   trialDays: 14,
-  telegram: '',
+  telegram: 'sander_l',
 };
 
 export function formatRub(value: number): string {
