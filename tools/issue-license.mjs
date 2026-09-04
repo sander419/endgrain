@@ -10,9 +10,14 @@
  * Зависимостей нет: node:crypto умеет WebCrypto с 16-й версии.
  *
  *   node tools/issue-license.mjs keygen
+ *   node tools/issue-license.mjs --workshop "Хиборг" --trial
  *   node tools/issue-license.mjs --workshop "Хиборг" --months 12
  *   node tools/issue-license.mjs --workshop "Хиборг" --perpetual
  *   node tools/issue-license.mjs --check <ключ>
+ *
+ * Команда печатает готовое сообщение покупателю: ключ, срок и что с ним
+ * делать. Собирать письмо руками каждый раз — способ рано или поздно
+ * отправить чужой ключ не тому.
  */
 import { webcrypto } from 'node:crypto';
 import { readFile, writeFile, access } from 'node:fs/promises';
@@ -24,6 +29,9 @@ const PRIVATE_PATH = join(HERE, 'license-private.jwk.json');
 const PUBLIC_MODULE = join(HERE, '..', 'src', 'core', 'licensePublicKey.ts');
 const ALGORITHM = { name: 'ECDSA', namedCurve: 'P-256' };
 const SIGN = { name: 'ECDSA', hash: 'SHA-256' };
+
+/** Сколько длится проба по умолчанию. Две недели — это два-три реальных заказа. */
+const TRIAL_DAYS = 14;
 
 function toBase64Url(input) {
   const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
@@ -121,7 +129,15 @@ async function issue(args) {
     return;
   }
 
-  const months = args.perpetual ? null : Number(args.months ?? 12);
+  const trial = args.trial === true || args.trial !== undefined;
+  const trialDays = trial ? Number(args.trial === true ? TRIAL_DAYS : args.trial) : 0;
+  if (trial && (!Number.isFinite(trialDays) || trialDays <= 0)) {
+    console.error('--trial без значения даёт 14 дней; с значением — положительное число дней');
+    process.exitCode = 1;
+    return;
+  }
+
+  const months = trial || args.perpetual ? null : Number(args.months ?? 12);
   if (months !== null && (!Number.isFinite(months) || months <= 0)) {
     console.error('--months должно быть положительным числом, либо укажите --perpetual');
     process.exitCode = 1;
@@ -130,7 +146,14 @@ async function issue(args) {
 
   const issued = new Date();
   const payload = { v: 1, w: workshop, p: 'workshop', i: isoDay(issued) };
-  if (months !== null) {
+  if (trial) {
+    const expires = new Date(issued);
+    expires.setDate(expires.getDate() + trialDays);
+    payload.e = isoDay(expires);
+    // Проба помечена в теле, поэтому её нельзя выдать за покупку: пометка
+    // подписана вместе со сроком и названием.
+    payload.k = 'trial';
+  } else if (months !== null) {
     const expires = new Date(issued);
     expires.setMonth(expires.getMonth() + months);
     payload.e = isoDay(expires);
@@ -148,11 +171,42 @@ async function issue(args) {
   const key = `${payloadB64}.${toBase64Url(signature)}`;
 
   console.log(`Мастерская: ${workshop}`);
+  console.log(`Тип:        ${trial ? `проба на ${trialDays} дн.` : 'покупка'}`);
   console.log(`Выпущен:    ${payload.i}`);
   console.log(`Действует:  ${payload.e ?? 'бессрочно'}`);
   console.log(`Длина:      ${key.length} символов`);
   console.log('');
-  console.log(key);
+  console.log('─── сообщение покупателю ───────────────────────────────');
+  console.log(message(workshop, key, payload, trial, trialDays));
+  console.log('────────────────────────────────────────────────────────');
+}
+
+/** Готовый текст: скопировать и отправить. */
+function message(workshop, key, payload, trial, trialDays) {
+  const until = payload.e ? `до ${payload.e.split('-').reverse().join('.')}` : 'бессрочно';
+  const head = trial
+    ? `Ключ для «${workshop}» — проба на ${trialDays} дней, ${until}.`
+    : `Ключ для «${workshop}», действует ${until}.`;
+
+  return [
+    head,
+    '',
+    key,
+    '',
+    'Что делать: откройте sander419.github.io/endgrain/, нажмите «Моя мастерская»',
+    'в шапке, вставьте ключ в поле и нажмите «Применить».',
+    '',
+    'Ключ проверяется на вашем компьютере, без интернета. Он привязан',
+    'к мастерской, а не к машине: переносите на любое число рабочих мест.',
+    'Профиль и заказы храните файлом — кнопки выгрузки там же.',
+    ...(trial
+      ? [
+          '',
+          'После пробы всё сделанное остаётся: заказы, витрина, журнал факта',
+          'никуда не денутся, просто перестанут открываться платные вкладки.',
+        ]
+      : []),
+  ].join('\n');
 }
 
 async function check(key) {

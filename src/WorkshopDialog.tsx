@@ -10,7 +10,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { useWorkshop } from './WorkshopContext';
-import { t, exportProfile, importProfile, MAX_LOGO_CHARS } from './core';
+import {
+  t,
+  tcount,
+  exportProfile,
+  importProfile,
+  MAX_LOGO_CHARS,
+  PRICING,
+  canContact,
+  formatRub,
+  purchaseLink,
+  purchaseMessage,
+} from './core';
 import type { LicenseState } from './core';
 
 interface Props {
@@ -25,12 +36,22 @@ export function formatIsoDay(iso: string): string {
 
 export function licenseStatusText(license: LicenseState): string {
   if (license.tier === 'workshop') {
+    // Проба называется пробой и считает дни: молчаливая проба, которая
+    // однажды просто перестаёт работать, читается как поломка.
+    if (license.trial) {
+      if (license.daysLeft !== null && license.daysLeft <= 0) return t('license.status.trialLast');
+      return t('license.status.trial', {
+        days: tcount('unit.day', license.daysLeft ?? 0),
+      });
+    }
     return license.expiresAt
       ? t('license.status.valid', { date: formatIsoDay(license.expiresAt) })
       : t('license.status.perpetual');
   }
   if (license.reason === 'expired' && license.expiresAt) {
-    return t('license.status.expired', { date: formatIsoDay(license.expiresAt) });
+    return license.trial
+      ? t('license.status.trialExpired', { date: formatIsoDay(license.expiresAt) })
+      : t('license.status.expired', { date: formatIsoDay(license.expiresAt) });
   }
   if (license.reason === 'malformed') return t('license.status.malformed');
   if (license.reason === 'forged') return t('license.status.forged');
@@ -125,6 +146,42 @@ export function WorkshopDialog({ onClose }: Props) {
   };
 
   const pro = license.tier === 'workshop';
+  // Покупателю показываем цену, пока он не купил. Пробе — тоже: она затем
+  // и нужна, чтобы к концу срока человек знал, сколько это стоит.
+  const paid = pro && !license.trial;
+
+  /**
+   * Кнопка запроса. Текст копируется отдельно: у личных чатов Telegram
+   * нет параметра с сообщением, а письмо, которое надо сочинять самому,
+   * пишут заметно реже.
+   */
+  const ask = (intent: 'trial' | 'year' | 'forever') => {
+    const link = purchaseLink();
+    if (!link) return null;
+    const request = purchaseMessage(intent, profile.name);
+    return (
+      <div className="buy-actions">
+        <a className="buy-link" href={link} target="_blank" rel="noreferrer noopener">
+          {t('license.buy.write')}
+        </a>
+        <button
+          className="link"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(request);
+              setNote(t('license.buy.copied'));
+            } catch {
+              // Буфер может быть закрыт политикой браузера — тогда показываем
+              // текст прямо в поле сообщения, копировать придётся руками.
+              setNote(request);
+            }
+          }}
+        >
+          {t('license.buy.copy')}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="help-backdrop" onClick={onClose}>
@@ -169,6 +226,32 @@ export function WorkshopDialog({ onClose }: Props) {
         </div>
 
         {!pro && <p className="help-note">{t('license.locked.body')}</p>}
+
+        {!paid && (
+          <div className="buy">
+            <h4>{t('license.buy.title')}</h4>
+
+            <div className="buy-row">
+              <b>{t('license.buy.trial', { days: tcount('unit.day', PRICING.trialDays) })}</b>
+              <span>{t('license.buy.trialNote')}</span>
+              {ask('trial')}
+            </div>
+
+            <div className="buy-row">
+              <b>{t('license.buy.year', { price: formatRub(PRICING.yearRub) })}</b>
+              {ask('year')}
+            </div>
+
+            <div className="buy-row">
+              <b>{t('license.buy.forever', { price: formatRub(PRICING.foreverRub) })}</b>
+              {ask('forever')}
+            </div>
+
+            <p className="help-note">{t('license.buy.what')}</p>
+            <p className="help-note">{t('license.buy.keepsWork')}</p>
+            {!canContact() && <p className="advice">{t('license.buy.noContact')}</p>}
+          </div>
+        )}
 
         <h3>{t('workshop.section.identity')}</h3>
 

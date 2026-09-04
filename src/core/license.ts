@@ -43,11 +43,30 @@ export interface LicensePayload {
   i: string;
   /** Дата окончания, ISO. Пусто — бессрочная. */
   e?: string;
+  /**
+   * Пробный ключ. Поле необязательное: ключи, выпущенные до появления пробы,
+   * читаются как обычные — иначе их пришлось бы перевыпускать.
+   *
+   * Проба открывает то же самое, что покупка. Урезанная проба показывает
+   * не продукт, а его тень, и по ней невозможно решить, стоит ли платить.
+   * Отличается только тем, что приложение честно называет её пробой
+   * и говорит, сколько осталось.
+   */
+  k?: 'trial';
 }
 
 export type LicenseState =
-  | { tier: 'free'; reason: FreeReason; workshop?: string; expiresAt?: string }
-  | { tier: 'workshop'; workshop: string; issuedAt: string; expiresAt?: string };
+  | { tier: 'free'; reason: FreeReason; workshop?: string; expiresAt?: string; trial?: boolean }
+  | {
+      tier: 'workshop';
+      workshop: string;
+      issuedAt: string;
+      expiresAt?: string;
+      /** Проба, а не покупка. Влияет только на то, что написано человеку. */
+      trial: boolean;
+      /** Сколько дней осталось. `null` — бессрочный ключ. */
+      daysLeft: number | null;
+    };
 
 export const FREE: LicenseState = { tier: 'free', reason: 'none' };
 
@@ -94,6 +113,9 @@ export function parseLicensePayload(key: string): LicensePayload | null {
     if (typeof payload.w !== 'string' || !payload.w.trim()) return null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.i)) return null;
     if (payload.e !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(payload.e)) return null;
+    if (payload.k !== undefined && payload.k !== 'trial') return null;
+    // Бессрочная проба — бессмыслица: это просто бесплатная версия навсегда.
+    if (payload.k === 'trial' && !payload.e) return null;
     return payload;
   } catch {
     return null;
@@ -155,7 +177,13 @@ export async function verifyLicenseKey(
     const now = options.now ?? Date.now();
     if (now > expiryDeadline(payload.e)) {
       // Название мастерской отдаём и здесь: человеку надо видеть, чей ключ истёк.
-      return { tier: 'free', reason: 'expired', workshop: payload.w, expiresAt: payload.e };
+      return {
+        tier: 'free',
+        reason: 'expired',
+        workshop: payload.w,
+        expiresAt: payload.e,
+        trial: payload.k === 'trial',
+      };
     }
   }
 
@@ -164,7 +192,22 @@ export async function verifyLicenseKey(
     workshop: payload.w,
     issuedAt: payload.i,
     expiresAt: payload.e,
+    trial: payload.k === 'trial',
+    daysLeft: payload.e ? daysUntil(payload.e, options.now ?? Date.now()) : null,
   };
+}
+
+/**
+ * Сколько календарных дней осталось до конца срока. Ноль — истекает сегодня.
+ *
+ * Календарными, а не по миллисекундам: «осталось 3 дня» не должно превращаться
+ * в «2 дня» оттого, что человек открыл приложение вечером.
+ */
+export function daysUntil(expiresAt: string, now: number): number {
+  const end = new Date(`${expiresAt}T00:00:00`);
+  const today = new Date(now);
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((end.getTime() - midnight.getTime()) / 86_400_000);
 }
 
 /** Собрать тело ключа. Используется CLI выпуска и тестами; подпись — снаружи. */

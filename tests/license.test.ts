@@ -7,6 +7,7 @@ import {
   expiryDeadline,
   isPro,
   CLOCK_GRACE_DAYS,
+  daysUntil,
   type LicensePayload,
 } from '../src/core/license';
 
@@ -146,6 +147,9 @@ describe('ключ не действует', () => {
       reason: 'expired',
       workshop: 'Хиборг',
       expiresAt: '2027-09-01',
+      // Истёкшая покупка и истёкшая проба ведут к разным предложениям,
+      // поэтому пометка доживает и до просроченного состояния.
+      trial: false,
     });
   });
 });
@@ -207,5 +211,94 @@ describe('разбор тела без криптографии', () => {
 
   it('тело без подписи не считается ключом', () => {
     expect(parseLicensePayload(encodeLicensePayload(HIBORG))).toBeNull();
+  });
+});
+
+describe('пробный ключ', () => {
+  const TRIAL: LicensePayload = {
+    v: 1,
+    w: 'Столярка «Дубрава»',
+    p: 'workshop',
+    i: '2026-09-04',
+    e: '2026-09-18',
+    k: 'trial',
+  };
+
+  it('проба открывает то же самое, что покупка', async () => {
+    // Урезанная проба показывает не продукт, а его тень: по ней нельзя решить,
+    // стоит ли платить.
+    const state = await verifyLicenseKey(await sign(TRIAL), {
+      publicJwk,
+      now: Date.parse('2026-09-10T12:00:00'),
+    });
+    expect(state.tier).toBe('workshop');
+    expect(isPro(state)).toBe(true);
+  });
+
+  it('приложение знает, что это проба, и сколько осталось', async () => {
+    const state = await verifyLicenseKey(await sign(TRIAL), {
+      publicJwk,
+      now: Date.parse('2026-09-10T12:00:00'),
+    });
+    if (state.tier !== 'workshop') return expect.fail('ключ должен действовать');
+    expect(state.trial).toBe(true);
+    expect(state.daysLeft).toBe(8);
+  });
+
+  it('обычный ключ пробой не считается', async () => {
+    const state = await verifyLicenseKey(await sign(HIBORG), {
+      publicJwk,
+      now: Date.parse('2027-01-15T12:00:00'),
+    });
+    if (state.tier !== 'workshop') return expect.fail('ключ должен действовать');
+    expect(state.trial).toBe(false);
+  });
+
+  it('у бессрочного ключа остатка дней нет, а не ноль', async () => {
+    // Ноль прочитался бы как «истекает сегодня».
+    const key = await sign({ v: 1, w: 'Хиборг', p: 'workshop', i: '2026-09-01' });
+    const state = await verifyLicenseKey(key, { publicJwk });
+    if (state.tier !== 'workshop') return expect.fail('ключ должен действовать');
+    expect(state.daysLeft).toBeNull();
+  });
+
+  it('истёкшая проба помнит, что была пробой: предложение купить зависит от этого', async () => {
+    const state = await verifyLicenseKey(await sign(TRIAL), {
+      publicJwk,
+      now: Date.parse('2026-10-01T12:00:00'),
+    });
+    expect(state.tier).toBe('free');
+    if (state.tier === 'free') {
+      expect(state.reason).toBe('expired');
+      expect(state.trial).toBe(true);
+    }
+  });
+
+  it('пометку пробы нельзя снять: она подписана вместе со сроком', async () => {
+    const key = await sign(TRIAL);
+    const [, signature] = key.split('.');
+    const forged = encodeLicensePayload({ ...TRIAL, k: undefined });
+    const state = await verifyLicenseKey(`${forged}.${signature}`, { publicJwk });
+    expect(state).toEqual({ tier: 'free', reason: 'forged' });
+  });
+
+  it('бессрочная проба не разбирается: это просто бесплатная версия навсегда', () => {
+    const payload = { v: 1, w: 'Х', p: 'workshop', i: '2026-09-04', k: 'trial' };
+    expect(parseLicensePayload(`${encodeLicensePayload(payload as LicensePayload)}.sig`)).toBeNull();
+  });
+
+  it('чужое значение в поле типа ключ не проходит', () => {
+    const payload = { ...TRIAL, k: 'forever' };
+    expect(parseLicensePayload(`${encodeLicensePayload(payload as LicensePayload)}.sig`)).toBeNull();
+  });
+
+  it('остаток дней не зависит от времени суток', () => {
+    const morning = daysUntil('2026-09-18', Date.parse('2026-09-10T08:00:00'));
+    const evening = daysUntil('2026-09-18', Date.parse('2026-09-10T23:30:00'));
+    expect(morning).toBe(evening);
+  });
+
+  it('в последний день остаётся ноль, а не минус', () => {
+    expect(daysUntil('2026-09-18', Date.parse('2026-09-18T10:00:00'))).toBe(0);
   });
 });

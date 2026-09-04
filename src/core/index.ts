@@ -33,3 +33,4 @@ export * from './registry';
 export * from './factlog';
 export * from './showcase';
 export * from './showcaseHtml';
+export * from './pricing';
